@@ -6,7 +6,7 @@ authors = [
     {name = "Andrea Duina"}
 ]
 readme = "README.md"
-requires-python = ">=3.12,<4.0"
+requires-python = ">=3.10,<4.0"
 dependencies = [
     "numpy (>=2.2.3,<3.0.0)",
     "scipy (>=1.15.1,<2.0.0)",
