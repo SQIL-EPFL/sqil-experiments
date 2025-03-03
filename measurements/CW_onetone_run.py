@@ -29,6 +29,7 @@ sys.path.append("../analysis_code")
 from CW_onetone_plot import *
 from spectroscopy_1D_plot import spectroscopy_1D_plot
 from spectroscopy_2D_plot import spectroscopy_2D_plot
+from plot_spectroscopy import plot_spectroscopy
 
 ####################################################################################
 Yokogawa = False  # True or False
@@ -217,37 +218,30 @@ with DDH5Writer(datadict, db_path_local, name=exp_name) as writer:
 
 ### plotting
 path = str(filepath_parent)
-# plot 1D vs ro frequency
-if param_dict["CW_onetone"]["sweep"] == False:
-    plotting_1D_vs_ro_freq(path)
+experiment_id = "CW_onetone"
+sweep_param = param_dict["CW_onetone"]["sweep"]
 
-# plot 1D vs ro power
-if freq_npts == 1:
-    if param_dict["CW_onetone"]["sweep"] == "ro_power":
-        plotting_1D_vs_ro_power(path)
-# plot 1D vs current
-if freq_npts == 1:
-    if param_dict["CW_onetone"]["sweep"] == "current":
-        plotting_1D_vs_current(path)
-
-# plot 1p5D vs ro_power
-if not freq_npts == 1:
-    if param_dict["CW_onetone"]["sweep"] == "ro_power":
-        plotting_1p5D_vs_ro_power(path)
-# plot 1p5D vs current
-if not freq_npts == 1:
-    if param_dict["CW_onetone"]["sweep"] == "current":
-        plotting_1p5D_vs_current(path)
-
-# plot 2D vs ro_freq vs ro_power
-if not freq_npts == 1:
-    if param_dict["CW_onetone"]["sweep"] == "ro_power":
-        plotting_2D_vs_ro_power(path)
-# plot 2D vs current
-if not freq_npts == 1:
-    if param_dict["CW_onetone"]["sweep"] == "current":
-        plotting_2D_vs_current(path)
-
-# copy the directory to the server
+if sweep_param == False:
+    # Simple 1D plot vs ro frequency (no additional sweep)
+    plot_spectroscopy([path], experiment_id)
+else:    
+    if freq_npts == 1:
+        # 1D plot vs sweep parameter
+        plot_spectroscopy([path], experiment_id,
+            main_sweep_param=sweep_param,
+            extend_title=f" 1D vs {sweep_param}"
+        )
+    else:
+        # We have multiple frequency points and a sweep parameter
+        # Create both 1.5D and 2D plots
+        plot_spectroscopy([path], experiment_id,
+            main_sweep_param=sweep_param,
+            extend_title=f" 1.5D vs {sweep_param}"
+        )
+        
+        plot_spectroscopy([path], experiment_id,
+            main_sweep_param=sweep_param,
+            extend_title=f" 2D vs {sweep_param}"
+        )
 copy_tree(filepath_parent, new_path)
 plt.show()
