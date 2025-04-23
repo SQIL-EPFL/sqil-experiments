@@ -5,7 +5,7 @@ def get_device_setup() -> DeviceSetup:
     setup.add_dataserver(host="localhost", port=8004)
 
     setup.add_instruments(
-        SHFQC(uid="device_shfqc", address="dev12422", device_options="SHFQC/QC6CH"),
+        SHFQC(uid="device_shfqc", address="dev12183", device_options="SHFQC/QC6CH"),
     )
 
     setup.add_connections("device_shfqc",
