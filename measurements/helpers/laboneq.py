@@ -1,6 +1,6 @@
 from pprint import pprint
 
-from laboneq.contrib.example_helpers.barebones.tunable_transmon import TunableTransmon
+from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
 
 
 def get_physical_signal_name(setup, quid, signal_name):
@@ -31,8 +31,8 @@ class ExperimentSettings:
 
 def create_qubit_from_param_dict(
     param_dict: dict,
-) -> tuple[TunableTransmon, ExperimentSettings]:
-    qubit = TunableTransmon(
+) -> tuple[TunableTransmonQubit, ExperimentSettings]:
+    qubit = TunableTransmonQubit(
         name="q0",
         readout_amplitude=1.0,
         drive_amplitude=1.0,
