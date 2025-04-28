@@ -1,4 +1,27 @@
+from pprint import pprint
+
 from laboneq.contrib.example_helpers.barebones.tunable_transmon import TunableTransmon
+
+
+def get_physical_signal_name(setup, quid, signal_name):
+    logical_signal = setup.logical_signal_groups[quid].logical_signals[signal_name]
+    return logical_signal.physical_channel.uid
+
+
+def print_qpu_signals(setup):
+    qubit_signals = {
+        quid: list(lsg.logical_signals)
+        for quid, lsg in setup.logical_signal_groups.items()
+    }
+    connections = {
+        quid: {
+            sig_name: get_physical_signal_name(setup, quid, sig_name)
+            for sig_name in signals
+        }
+        for quid, signals in qubit_signals.items()
+    }
+
+    pprint(connections)
 
 
 class ExperimentSettings:
