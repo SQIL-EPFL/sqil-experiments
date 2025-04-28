@@ -21,7 +21,6 @@ zi_descriptor = generate_descriptor(
     ip_address="localhost",
 )
 zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
-print_qpu_signals(zi_setup)
 
 # Instruments
 instruments = {"zi_session": {"type": "ZI", "setup_obj": zi_setup}}
