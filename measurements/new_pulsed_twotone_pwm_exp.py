@@ -7,12 +7,14 @@ and run the experiment saving the data with DDH5 Writer
 
 import matplotlib.pyplot as plt
 import numpy as np
-from helpers.utilities import shfqa_power_calculator
+from laboneq.dsl import measure, play
 from laboneq.simple import *
-from laboneq.dsl import play, measure
 from laboneq.simple import qpu
 
+from measurements.helpers.utils import shfqa_power_calculator
+
 setup_file = __file__
+
 
 def main_exp(session, qubit, settings, writer):
     exp = Experiment(
@@ -77,12 +79,8 @@ def main_exp(session, qubit, settings, writer):
     ################## Calibration ##################
     cal = Calibration()
 
-    ro_if_oscillator = Oscillator(
-        frequency=qubit.ro_freq - qubit.ro_lo_freq
-    )
-    ro_lo_oscillator = Oscillator(
-        frequency=qubit.ro_lo_freq
-    )
+    ro_if_oscillator = Oscillator(frequency=qubit.ro_freq - qubit.ro_lo_freq)
+    ro_lo_oscillator = Oscillator(frequency=qubit.ro_lo_freq)
 
     ro_power_range, ro_signal_amp = shfqa_power_calculator(qubit.ro_power)
 
