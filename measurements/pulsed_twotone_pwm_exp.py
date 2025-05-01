@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from helpers.utilities import shfqa_power_calculator
 from laboneq.simple import *
-from plottr.data.qipe_datadict_storage import DataDict, DDH5Writer
+from plottr.data.datadict_storage import DataDict, DDH5Writer
 
 setup_file = __file__
 

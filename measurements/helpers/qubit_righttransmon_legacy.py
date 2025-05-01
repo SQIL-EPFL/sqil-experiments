@@ -1,16 +1,15 @@
-from laboneq.contrib.example_helpers.barebones.tunable_transmon import TunableTransmon
+from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
+
 
 class ExperimentSettings:
     def __init__(self):
         pass
 
-def create_qubit_from_param_dict(param_dict: dict) -> tuple[TunableTransmon, ExperimentSettings]:
-    qubit = TunableTransmon(
-        name="q0",
-        readout_amplitude=1.0,
-        drive_amplitude=1.0,
-        port_delay=0,
-    )
+
+def create_qubit_from_param_dict(
+    param_dict: dict,
+) -> tuple[TunableTransmonQubit, ExperimentSettings]:
+    qubit = TunableTransmonQubit(uid="q0")
     settings = ExperimentSettings()
 
     exp_keys = ["external_avg", "plot", "save", "fit", "pulsesheet", "write", "export"]

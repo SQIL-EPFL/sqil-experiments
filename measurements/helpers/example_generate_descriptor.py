@@ -2,15 +2,13 @@ from laboneq.simple import *
 from laboneq.contrib.example_helpers.generate_descriptor import generate_descriptor
 
 descriptor = generate_descriptor(
-    pqsc=["DEV10190"],
-    hdawg_8=["DEV9000"],
-    shfqc_6=["DEV12422"],
+    shfqc_6=["dev12183"],
     number_data_qubits=1,
-    number_flux_lines=1,
+    number_flux_lines=0,
     include_cr_lines=False,
-    multiplex=False,
-    number_multiplex=0,
-    get_zsync=True,
+    multiplex=True,
+    number_multiplex=1,
+    get_zsync=False,
     ip_address="localhost",
 )
 
