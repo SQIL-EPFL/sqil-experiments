@@ -20,10 +20,19 @@ zi_descriptor = generate_descriptor(
     get_zsync=False,
     ip_address="localhost",
 )
-zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
+# zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
 
 # Instruments
-instruments = {"zi_session": {"type": "ZI", "setup_obj": zi_setup}}
+instruments = {
+    "sgs": {
+        "type": "LO",
+        "model": "RohdeSchwarzSGS100A",
+        "name": "SGSA100",
+        "address": "TCPIP0::192.168.1.201::inst0::INSTR",
+        # "connect": lambda: print("CUSTOM SGS CONNECTION"),
+    },
+    "zi": {"type": "ZI", "descriptor": zi_descriptor, "address": "localhost"},
+}
 
 
 # Initialize QPU
