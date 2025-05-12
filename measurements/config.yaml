@@ -1,1 +1,2 @@
 setup_path: "./setup/setup_test.py"
+data_path: "./data"

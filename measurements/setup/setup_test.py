@@ -9,6 +9,10 @@ from laboneq_applications.qpu_types.tunable_transmon import (
 
 from helpers.laboneq import print_qpu_signals
 
+from helpers.sqil_transmon.qubit import SqilTransmon
+from helpers.sqil_transmon.operations import SqilTransmonOperations
+
+
 # Zurich instruments stetup
 zi_descriptor = generate_descriptor(
     shfqc_6=["dev12183"],
@@ -20,7 +24,15 @@ zi_descriptor = generate_descriptor(
     get_zsync=False,
     ip_address="localhost",
 )
+
+
 # zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
+def get_qpu(zi_setup):
+    qubits = SqilTransmon.from_device_setup(zi_setup)
+    quantum_operations = SqilTransmonOperations()
+    qpu = QPU(qubits=qubits, quantum_operations=quantum_operations)
+    return qpu
+
 
 # Instruments
 instruments = {
@@ -29,9 +41,21 @@ instruments = {
         "model": "RohdeSchwarzSGS100A",
         "name": "SGSA100",
         "address": "TCPIP0::192.168.1.201::inst0::INSTR",
-        # "connect": lambda: print("CUSTOM SGS CONNECTION"),
+        # "connect": lambda self, *args, **kwargs: print("CUSTOM CONNECT TO", self.name),
     },
-    "zi": {"type": "ZI", "descriptor": zi_descriptor, "address": "localhost"},
+    "zi": {
+        "type": "ZI",
+        "address": "localhost",
+        "descriptor": zi_descriptor,
+        "get_qpu": get_qpu,
+    },
+}
+
+# Data storage
+storage = {
+    "db_type": "plottr",
+    "db_path": r"./data",
+    "db_path_local": r"./data_local",
 }
 
 
