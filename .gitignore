@@ -172,3 +172,5 @@ cython_debug/
 
 
 laboneq_output/
+data_local/
+data
