@@ -73,7 +73,7 @@ class RRSpec(sqil.experiment.ExperimentHandler):
     }
     exp_name = "rr spectroscopy"
 
-    def sequence(self, qu_idx, frequencies):
+    def sequence(self, qu_idx, frequencies, *params, **kwargs):
         self.qpu.qubits[qu_idx].update(
             **{
                 "drive_lo_frequency": 5e9,
@@ -83,12 +83,19 @@ class RRSpec(sqil.experiment.ExperimentHandler):
         )
         return create_experiment(self.qpu, self.qpu.qubits[qu_idx], frequencies)
 
-    def analyze(self, result, *params, **kwargs):
-        data = result["q0"]["result"].data
-        frequencies = params[1]
+    def analyze(self, result, path, *params, **kwargs):
+        data, freq, sweep = sqil.extract_h5_data(
+            path, ["data", "frequencies", "sweep0"]
+        )
 
-        fig, ax = plt.subplots(1, 1)
-        ax.plot(frequencies, np.abs(data))
+        sweeps = kwargs.get("sweeps", None)
+        if sweeps is None:
+            fig, ax = plt.subplots(1, 1)
+            ax.plot(freq, np.abs(data))
+        else:
+            fig, ax = plt.subplots(1, 1)
+            sweep = sweeps[list(sweeps.keys())[0]]
+            ax.pcolormesh(freq, sweep, np.abs(data))
 
         # datadict =
 

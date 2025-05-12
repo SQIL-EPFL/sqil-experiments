@@ -54,8 +54,8 @@ instruments = {
 # Data storage
 storage = {
     "db_type": "plottr",
-    "db_path": r"./data",
-    "db_path_local": r"./data_local",
+    "db_path": r"C:\Users\sqil\Desktop\code\sqil-experiments\measurements\data",
+    "db_path_local": r"C:\Users\sqil\Desktop\code\sqil-experiments\measurements\data_local",
 }
 
 
