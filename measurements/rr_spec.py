@@ -57,7 +57,7 @@ class ResonatorSpectroscopyExperimentOptions:
         description="Acquisition type to use for the experiment.",
     )
     averaging_mode: str | AveragingMode = option_field(
-        AveragingMode.CYCLIC,
+        AveragingMode.SINGLE_SHOT,
         description="Averaging mode to use for the experiment.",
         converter=AveragingMode,
     )
@@ -106,35 +106,62 @@ def create_experiment(
 
 
 class RRSpec(sqil.experiment.ExperimentHandler):
+    exp_name = "rr_spectroscopy"
     db_schema = {
         "data": {"type": "data"},
-        "frequencies": {"type": "axis", "unit": "Hz"},
+        "frequencies": {"type": "axis", "plot": "x", "unit": "Hz"},
     }
-    exp_name = "rr spectroscopy"
 
-    def sequence(self, qu_idx, frequencies, *params, **kwargs):
+    def sequence(
+        self,
+        frequencies,
+        qu_idx=0,
+        options: ResonatorSpectroscopyExperimentOptions | None = None,
+        *params,
+        **kwargs,
+    ):
         self.qpu.qubits[qu_idx].update(
             **{
                 "drive_lo_frequency": 5e9,
                 "readout_lo_frequency": 7.2e9,
                 "readout_resonator_frequency": 7.4e9,
+                "readout_range_out": -30,
             }
         )
-        return create_experiment(self.qpu, self.qpu.qubits[qu_idx], frequencies)
+        return create_experiment(
+            self.qpu, self.qpu.qubits[qu_idx], frequencies, options=options
+        )
 
     def analyze(self, result, path, *params, **kwargs):
         data, freq, sweep = sqil.extract_h5_data(
             path, ["data", "frequencies", "sweep0"]
         )
+        options = kwargs.get("options", ResonatorSpectroscopyExperimentOptions())
 
-        is1D = np.array(data).ndim == 1
-        print(data.shape)
-
-        if is1D:
-            fig, ax = plt.subplots(1, 1)
-            ax.plot(freq, np.abs(data))
+        if options.averaging_mode == AveragingMode.SINGLE_SHOT:
+            fig, ax = plt.subplots(1, 1, figsize=(16, 5))
+            linmag = np.abs(data[0])
+            ax.errorbar(
+                freq[0],
+                np.mean(linmag, axis=0),
+                np.std(linmag, axis=0),
+                fmt="-o",
+                color="tab:blue",
+                label="Mean with Error",
+                ecolor="tab:orange",
+                capsize=5,
+                capthick=2,
+                elinewidth=2,
+                markersize=5,
+            )
         else:
-            fig, ax = plt.subplots(1, 1)
-            ax.pcolormesh(freq, sweep, np.abs(data))
+            is1D = np.array(data).ndim == 1
+            if is1D:
+                fig, ax = plt.subplots(1, 1)
+                ax.plot(freq, np.abs(data))
+            else:
+                fig, ax = plt.subplots(1, 1)
+                ax.pcolormesh(freq, sweep, np.abs(data))
 
         fig.savefig(f"{path}/fig.png")
+        plt.show()

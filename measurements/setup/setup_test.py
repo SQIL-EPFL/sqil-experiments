@@ -36,13 +36,13 @@ def get_qpu(zi_setup):
 
 # Instruments
 instruments = {
-    "sgs": {
-        "type": "LO",
-        "model": "RohdeSchwarzSGS100A",
-        "name": "SGSA100",
-        "address": "TCPIP0::192.168.1.201::inst0::INSTR",
-        # "connect": lambda self, *args, **kwargs: print("CUSTOM CONNECT TO", self.name),
-    },
+    # "sgs": {
+    #     "type": "LO",
+    #     "model": "RohdeSchwarzSGS100A",
+    #     "name": "SGSA100",
+    #     "address": "TCPIP0::192.168.1.201::inst0::INSTR",
+    #     # "connect": lambda self, *args, **kwargs: print("CUSTOM CONNECT TO", self.name),
+    # },
     "zi": {
         "type": "ZI",
         "address": "localhost",
