@@ -12,16 +12,55 @@ from helpers.sqil_transmon.qubit import SqilTransmon
 from helpers.sqil_transmon.operations import SqilTransmonOperations
 
 from laboneq_applications.experiments.options import (
-    ResonatorSpectroscopyExperimentOptions,
+    BaseExperimentOptions,
 )
 from laboneq_applications.core import validation
-from laboneq.dsl.enums import AcquisitionType
+from laboneq.dsl.enums import AcquisitionType, AveragingMode
 from laboneq.simple import Experiment, SweepParameter, dsl
 
 from laboneq.dsl.quantum.quantum_element import QuantumElement
 from numpy.typing import ArrayLike
 
 from helpers.plottr import DataDict, DDH5Writer
+
+from laboneq.workflow import (
+    option_field,
+    task_options,
+    workflow_options,
+)
+
+
+@task_options(base_class=BaseExperimentOptions)
+class ResonatorSpectroscopyExperimentOptions:
+    """Base options for the resonator spectroscopy experiment.
+
+    Additional attributes:
+        use_cw:
+            Perform a CW spectroscopy where no measure pulse is played.
+            Default: False.
+        spectroscopy_reset_delay:
+            How long to wait after an acquisition in seconds.
+            Default: 1e-6.
+        acquisition_type:
+            Acquisition type to use for the experiment.
+            Default: `AcquisitionType.SPECTROSCOPY`.
+    """
+
+    use_cw: bool = option_field(
+        False, description="Perform a CW spectroscopy where no measure pulse is played."
+    )
+    spectroscopy_reset_delay: float = option_field(
+        1e-6, description="How long to wait after an acquisition in seconds."
+    )
+    acquisition_type: AcquisitionType = option_field(
+        AcquisitionType.SPECTROSCOPY,
+        description="Acquisition type to use for the experiment.",
+    )
+    averaging_mode: str | AveragingMode = option_field(
+        AveragingMode.CYCLIC,
+        description="Averaging mode to use for the experiment.",
+        converter=AveragingMode,
+    )
 
 
 @dsl.qubit_experiment
@@ -88,28 +127,14 @@ class RRSpec(sqil.experiment.ExperimentHandler):
             path, ["data", "frequencies", "sweep0"]
         )
 
-        sweeps = kwargs.get("sweeps", None)
-        if sweeps is None:
+        is1D = np.array(data).ndim == 1
+        print(data.shape)
+
+        if is1D:
             fig, ax = plt.subplots(1, 1)
             ax.plot(freq, np.abs(data))
         else:
             fig, ax = plt.subplots(1, 1)
-            sweep = sweeps[list(sweeps.keys())[0]]
             ax.pcolormesh(freq, sweep, np.abs(data))
 
-        # datadict =
-
-        # with DDH5Writer(datadict, db_path_local, name=exp_name) as writer:
-        #     filepath_parent = writer.filepath.parent
-
-        #     # take the last two stages of the filepath_parent
-        #     path = str(filepath_parent)
-        #     last_two_parts = path.split(os.sep)[-2:]
-        #     new_path = os.path.join(db_path, *last_two_parts)
-        #     writer.save_text("#path.md", new_path)
-
-        #     writer.add_data(
-        #         readout_delay=frequencies,
-        #         data=data,
-        #     )
-        #     fig.savefig(f"{os.path.join(db_path_local, *last_two_parts)}/fig.png")
+        fig.savefig(f"{path}/fig.png")
