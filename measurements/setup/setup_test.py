@@ -11,6 +11,24 @@ from helpers.laboneq import print_qpu_signals
 
 from helpers.sqil_transmon.qubit import SqilTransmon
 from helpers.sqil_transmon.operations import SqilTransmonOperations
+import os
+
+# Checklist for every cooldown
+# - update data_folder_name
+# - update the initial_readout_lo_freq, an approximate value is required to run onetone
+data_folder_name = "test"
+initial_readout_lo_freq = 7.2e9
+
+
+# Data storage
+db_root = r"C:\Users\sqil\Desktop\code\sqil-experiments\measurements\data"
+db_root_local = r"C:\Users\sqil\Desktop\code\sqil-experiments\measurements\data_local"
+storage = {
+    "db_type": "plottr",
+    "db_path": os.path.join(db_root, data_folder_name),
+    "db_path_local": os.path.join(db_root_local, data_folder_name),
+    "qpu_filename": "qpu.json",
+}
 
 
 # Zurich instruments stetup
@@ -31,6 +49,15 @@ def get_qpu(zi_setup):
     qubits = SqilTransmon.from_device_setup(zi_setup)
     quantum_operations = SqilTransmonOperations()
     qpu = QPU(qubits=qubits, quantum_operations=quantum_operations)
+
+    # Set required qubit parameters
+    for qubit in qpu.qubits:
+        qubit.update(
+            **{
+                "readout_lo_frequency": initial_readout_lo_freq,
+                "drive_lo_frequency": 5e9,
+            }
+        )
     return qpu
 
 
@@ -49,13 +76,6 @@ instruments = {
         "descriptor": zi_descriptor,
         "get_qpu": get_qpu,
     },
-}
-
-# Data storage
-storage = {
-    "db_type": "plottr",
-    "db_path": r"C:\Users\sqil\Desktop\code\sqil-experiments\measurements\data",
-    "db_path_local": r"C:\Users\sqil\Desktop\code\sqil-experiments\measurements\data_local",
 }
 
 

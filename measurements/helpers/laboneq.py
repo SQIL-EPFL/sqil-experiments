@@ -1,4 +1,5 @@
 from pprint import pprint
+import numpy as np
 
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
 from .utils import shfqa_power_calculator
@@ -23,6 +24,26 @@ def print_qpu_signals(setup):
     }
 
     pprint(connections)
+
+
+def shfqa_power_calculator(ro_power):
+    """
+    Calculate oscillator power range and pulse amplitude
+    to get the correct output power for SHFQA out port
+    "amp" should must be lower than 0.95 not to overload power range!!
+
+    ro_power = 20 * np.log10(pulse_amp) + power_range
+    """
+    prange_list = np.linspace(-30, 10, 9)
+    # if ro_power > 20*np.log10(0.95) + 10:
+    # raise ValueError(f'The maximum power of SHFQC is {20*np.log10(0.95) + 10} dBm!')
+    for prange in prange_list:
+        # if ro_power <= 20*np.log10(0.95) + prange:
+        if ro_power <= prange:
+            power_range = prange
+            signal_amp = 10 ** ((ro_power - power_range) / 20)
+            break
+    return power_range, signal_amp
 
 
 class ExperimentSettings:

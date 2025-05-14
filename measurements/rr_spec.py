@@ -57,7 +57,7 @@ class ResonatorSpectroscopyExperimentOptions:
         description="Acquisition type to use for the experiment.",
     )
     averaging_mode: str | AveragingMode = option_field(
-        AveragingMode.SINGLE_SHOT,
+        AveragingMode.CYCLIC,
         description="Averaging mode to use for the experiment.",
         converter=AveragingMode,
     )
@@ -120,14 +120,13 @@ class RRSpec(sqil.experiment.ExperimentHandler):
         *params,
         **kwargs,
     ):
-        self.qpu.qubits[qu_idx].update(
-            **{
-                "drive_lo_frequency": 5e9,
-                "readout_lo_frequency": 7.2e9,
-                "readout_resonator_frequency": 7.4e9,
-                "readout_range_out": -30,
-            }
-        )
+        # self.qpu.qubits[qu_idx].update(
+        #     **{
+        #         "drive_lo_frequency": 5e9,
+        #         "readout_lo_frequency": 5e9,
+        #         "readout_resonator_frequency": 5e9,
+        #     }
+        # )
         return create_experiment(
             self.qpu, self.qpu.qubits[qu_idx], frequencies, options=options
         )
@@ -137,6 +136,8 @@ class RRSpec(sqil.experiment.ExperimentHandler):
             path, ["data", "frequencies", "sweep0"]
         )
         options = kwargs.get("options", ResonatorSpectroscopyExperimentOptions())
+
+        result = None
 
         if options.averaging_mode == AveragingMode.SINGLE_SHOT:
             fig, ax = plt.subplots(1, 1, figsize=(16, 5))
@@ -164,4 +165,3 @@ class RRSpec(sqil.experiment.ExperimentHandler):
                 ax.pcolormesh(freq, sweep, np.abs(data))
 
         fig.savefig(f"{path}/fig.png")
-        plt.show()
