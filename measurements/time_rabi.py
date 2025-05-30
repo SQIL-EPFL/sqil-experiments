@@ -3,7 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from laboneq.dsl.quantum import QPU
-from laboneq.simple import Experiment, SweepParameter, dsl, pulse_library, SectionAlignment
+from laboneq.simple import (
+    Experiment,
+    SweepParameter,
+    dsl,
+    pulse_library,
+    SectionAlignment,
+)
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
 
 from laboneq_applications.core import validation
@@ -12,6 +18,11 @@ from laboneq.workflow import option_field, task_options
 
 from laboneq.dsl.quantum.quantum_element import QuantumElement
 from numpy.typing import ArrayLike
+
+import sys
+
+sys.path.append(r"Z:\Projects\BottomLoader\Measurement\analysis_code")
+from inspection import inspect_decaying_oscillations
 
 
 @task_options(base_class=BaseExperimentOptions)
@@ -60,22 +71,15 @@ def create_experiment(
         with dsl.sweep(name="time_rabi_sweep", parameter=sweep_param) as pulse_len:
             with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
                 qop.prepare_state.omit_section(qubit, state=opts.transition[0])
-                qop.play(
-                    signal=qubit,
-                    pulse=pulse_library.gaussian_square(
-                        uid="qu_pulse",
-                        length=400e-9,  # overridden below
-                        amplitude=1.0,
-                        can_compress=True,
-                    ),
+                qop.rx(
+                    q=qubit,
+                    angle=None,
+                    amplitude=1,
                     length=pulse_len + 20e-9,
-                    pulse_parameters={"width": pulse_len},
                 )
             with dsl.section(name="measure", alignment=SectionAlignment.LEFT):
                 qop.measure(qubit, dsl.handles.result_handle(qubit.uid))
                 qop.passive_reset(qubit)
-
-    return dsl.get_experiment()
 
 
 class TimeRabi(sqil.experiment.ExperimentHandler):
@@ -105,22 +109,24 @@ class TimeRabi(sqil.experiment.ExperimentHandler):
             path, ["data", "pulse_lengths", "sweep0"]
         )
 
-        re = np.real(data)
-        im = np.imag(data)
+        inspect_decaying_oscillations(lengths, data)
+
+        # re = np.real(data)
+        # im = np.imag(data)
 
         # Plot IQ (real vs imag)
-        fig1, ax1 = plt.subplots()
-        ax1.plot(re, im, "o-")
-        ax1.set_xlabel("Re")
-        ax1.set_ylabel("Im")
-        ax1.set_title("IQ Plane: Real vs Imag")
-        ax1.axis("equal")
-        fig1.savefig(f"{path}/time_rabi_IQ.png")
+        # fig1, ax1 = plt.subplots()
+        # ax1.plot(re, im, "o-")
+        # ax1.set_xlabel("Re")
+        # ax1.set_ylabel("Im")
+        # ax1.set_title("IQ Plane: Real vs Imag")
+        # ax1.axis("equal")
+        # fig1.savefig(f"{path}/time_rabi_IQ.png")
 
-        # Plot real vs pulse length
-        fig2, ax2 = plt.subplots()
-        ax2.plot(lengths, re, "o-")
-        ax2.set_xlabel("Pulse Length (s)")
-        ax2.set_ylabel("Re")
-        ax2.set_title("Rabi: Re vs Pulse Duration")
-        fig2.savefig(f"{path}/time_rabi_re_vs_length.png")
+        # # Plot real vs pulse length
+        # fig2, ax2 = plt.subplots()
+        # ax2.plot(lengths, im, "o-")
+        # ax2.set_xlabel("Pulse Length (s)")
+        # ax2.set_ylabel("Re")
+        # ax2.set_title("Rabi: Re vs Pulse Duration")
+        # fig2.savefig(f"{path}/time_rabi_re_vs_length.png")
