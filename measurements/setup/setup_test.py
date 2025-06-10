@@ -37,8 +37,8 @@ zi_descriptor = generate_descriptor(
     number_data_qubits=1,
     number_flux_lines=0,
     include_cr_lines=False,
-    multiplex=True,
-    number_multiplex=1,
+    multiplex=False,
+    number_multiplex=0,
     get_zsync=False,
     ip_address="localhost",
 )

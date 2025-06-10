@@ -1,6 +1,7 @@
 import sqil_core as sqil
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 
 from laboneq.dsl.quantum import QPU
 from laboneq.simple import (
@@ -19,14 +20,9 @@ from laboneq.workflow import option_field, task_options
 from laboneq.dsl.quantum.quantum_element import QuantumElement
 from numpy.typing import ArrayLike
 
-import sys
-
-sys.path.append(r"Z:\Projects\BottomLoader\Measurement\analysis_code")
-from inspection import inspect_decaying_oscillations
-
 
 @task_options(base_class=BaseExperimentOptions)
-class TimeRabiExperimentOptions:
+class TimeRabiOptions:
     """Options for the time Rabi experiment."""
 
     transition: str = option_field("ge", description="Transition to apply pulse.")
@@ -45,13 +41,13 @@ def create_experiment(
     qpu: QPU,
     qubit: QuantumElement,
     pulse_lengths: ArrayLike,
-    options: TimeRabiExperimentOptions | None = None,
+    options: TimeRabiOptions | None = None,
 ) -> Experiment:
-    opts = TimeRabiExperimentOptions() if options is None else options
+    opts = TimeRabiOptions() if options is None else options
     qubit, pulse_lengths = validation.validate_and_convert_single_qubit_sweeps(
         qubit, pulse_lengths
     )
-
+    print(opts.acquisition_type)
     qop = qpu.quantum_operations
 
     sweep_param = SweepParameter(
@@ -76,6 +72,7 @@ def create_experiment(
                     angle=None,
                     amplitude=1,
                     length=pulse_len + 20e-9,
+                    pulse={"can_compress": True, "width": pulse_len},
                 )
             with dsl.section(name="measure", alignment=SectionAlignment.LEFT):
                 qop.measure(qubit, dsl.handles.result_handle(qubit.uid))
@@ -93,7 +90,7 @@ class TimeRabi(sqil.experiment.ExperimentHandler):
         self,
         pulse_lengths,
         qu_idx=0,
-        options: TimeRabiExperimentOptions | None = None,
+        options: TimeRabiOptions | None = None,
         *params,
         **kwargs,
     ):
@@ -105,28 +102,47 @@ class TimeRabi(sqil.experiment.ExperimentHandler):
         )
 
     def analyze(self, result, path, *params, **kwargs):
+        # Read data
         data, lengths, sweep = sqil.extract_h5_data(
             path, ["data", "pulse_lengths", "sweep0"]
         )
 
-        inspect_decaying_oscillations(lengths, data)
+        # Analyze data
+        proj, inv = sqil.fit.transform_data(data, inv_transform=True)
+        fit_res = sqil.fit.fit_decaying_oscillations(lengths, proj)
+        x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
+        inverse_fit = inv(fit_res.predict(x_fit))
 
-        # re = np.real(data)
-        # im = np.imag(data)
+        # Make parameters pretty
+        omega_r = sqil.format_number(1 / fit_res.params[4], unit="Hz")
+        t_pi = sqil.format_number(fit_res.metadata["pi_time"], unit="s")
+        tau = sqil.format_number(fit_res.params[1], unit="s")
 
-        # Plot IQ (real vs imag)
-        # fig1, ax1 = plt.subplots()
-        # ax1.plot(re, im, "o-")
-        # ax1.set_xlabel("Re")
-        # ax1.set_ylabel("Im")
-        # ax1.set_title("IQ Plane: Real vs Imag")
-        # ax1.axis("equal")
-        # fig1.savefig(f"{path}/time_rabi_IQ.png")
+        sqil.set_plot_style(plt)
+        fig = plt.figure(figsize=(20, 7), constrained_layout=True)
+        gs = GridSpec(nrows=1, ncols=10, figure=fig, wspace=0.2)
 
-        # # Plot real vs pulse length
-        # fig2, ax2 = plt.subplots()
-        # ax2.plot(lengths, im, "o-")
-        # ax2.set_xlabel("Pulse Length (s)")
-        # ax2.set_ylabel("Re")
-        # ax2.set_title("Rabi: Re vs Pulse Duration")
-        # fig2.savefig(f"{path}/time_rabi_re_vs_length.png")
+        # Plot the projection
+        ax_proj = fig.add_subplot(gs[:, :6])  # 6/10 width
+        ax_proj.plot(lengths * 1e6, np.real(proj) * 1e3, "o")
+        ax_proj.plot(x_fit * 1e6, fit_res.predict(x_fit) * 1e3, "tab:red")
+        ax_proj.set_xlabel(r"Time [$\mu$s]")
+        ax_proj.set_ylabel("Projection [mV]")
+        ax_proj.set_title(
+            rf"$t_\pi = ${t_pi}  |  $\Omega_R = ${omega_r}  |  $\tau =${tau}"
+        )
+
+        # Plot IQ data
+        ax_iq = fig.add_subplot(gs[:, 6:])  # 4/10 width
+        ax_iq.scatter(0, 0, marker="+", color="black", s=150)
+        ax_iq.plot(data.real * 1e3, data.imag * 1e3, "o")
+        ax_iq.plot(inverse_fit.real * 1e3, inverse_fit.imag * 1e3, "tab:red")
+        ax_iq.set_xlabel("In-Phase [mV]")
+        ax_iq.set_ylabel("Quadrature [mV]")
+        ax_iq.set_aspect(aspect="equal", adjustable="datalim")
+
+        fig.suptitle("Time Rabi")
+
+        fig.savefig(f"{path}/time_rabi.png")
+
+        return fit_res.summary()
