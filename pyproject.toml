@@ -14,9 +14,9 @@ dependencies = [
     "lmfit (>=1.3.2,<2.0.0)",
     "black (==24.10.0)",
     "isort (==5.9.3)",
-    "laboneq-applications (>=2.4.0,<3.0.0)",
     "plottr (>=0.14.0,<0.15.0)",
-    "laboneq (>=2.51.0,<3.0.0)"
+    "laboneq (>=2.53.0,<3.0.0)",
+    "laboneq-applications (>=2.7.0,<3.0.0)",
 ]
 
 

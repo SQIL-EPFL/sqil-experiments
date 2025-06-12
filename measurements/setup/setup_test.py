@@ -1,5 +1,6 @@
 from laboneq import serializers
 from laboneq.contrib.example_helpers.generate_descriptor import generate_descriptor
+from laboneq.contrib.example_helpers.generate_device_setup import generate_device_setup
 from laboneq.dsl.quantum import QPU
 from laboneq.simple import DeviceSetup
 from laboneq_applications.qpu_types.tunable_transmon import (
@@ -31,7 +32,9 @@ storage = {
 }
 
 
-# Zurich instruments stetup
+# Zurich instruments setup from descriptor
+# Requires laboneq < 2.51 - generate_descriptor doesn't support
+# passing instrument options, like "SHFQC/QC4CH" which are now mandatory
 zi_descriptor = generate_descriptor(
     shfqc_6=["dev12183"],
     number_data_qubits=1,
@@ -42,16 +45,29 @@ zi_descriptor = generate_descriptor(
     get_zsync=False,
     ip_address="localhost",
 )
+# zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
+
+
+# Zurich Instruments setup
+def generate_zi_setup():
+    return generate_device_setup(
+        number_qubits=1,
+        shfqc=[
+            {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
+        ],
+        query_zsync=True,
+        query_options=False,
+    )
 
 
 # zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
-def get_qpu(zi_setup):
+def generate_qpu(zi_setup):
     qubits = SqilTransmon.from_device_setup(zi_setup)
     quantum_operations = SqilTransmonOperations()
-    qpu = QPU(qubits=qubits, quantum_operations=quantum_operations)
+    qpu = QPU(qubits, quantum_operations)
 
     # Set required qubit parameters
-    for qubit in qpu.qubits:
+    for qubit in qpu.quantum_elements:
         qubit.update(
             **{
                 "readout_lo_frequency": initial_readout_lo_freq,
@@ -73,8 +89,9 @@ instruments = {
     "zi": {
         "type": "ZI",
         "address": "localhost",
-        "descriptor": zi_descriptor,
-        "get_qpu": get_qpu,
+        # "descriptor": zi_descriptor,
+        "generate_setup": generate_zi_setup,
+        "generate_qpu": generate_qpu,
     },
 }
 

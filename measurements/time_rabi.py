@@ -1,4 +1,5 @@
 import sqil_core as sqil
+from sqil_core.experiment import ExperimentHandler
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -47,7 +48,6 @@ def create_experiment(
     qubit, pulse_lengths = validation.validate_and_convert_single_qubit_sweeps(
         qubit, pulse_lengths
     )
-    print(opts.acquisition_type)
     qop = qpu.quantum_operations
 
     sweep_param = SweepParameter(
@@ -79,7 +79,7 @@ def create_experiment(
                 qop.passive_reset(qubit)
 
 
-class TimeRabi(sqil.experiment.ExperimentHandler):
+class TimeRabi(ExperimentHandler):
     exp_name = "time_rabi"
     db_schema = {
         "data": {"type": "data"},
@@ -101,7 +101,7 @@ class TimeRabi(sqil.experiment.ExperimentHandler):
             options=options,
         )
 
-    def analyze(self, result, path, *params, **kwargs):
+    def analyze(self, path, *params, **kwargs):
         # Read data
         data, lengths, sweep = sqil.extract_h5_data(
             path, ["data", "pulse_lengths", "sweep0"]

@@ -1,4 +1,6 @@
 import sqil_core as sqil
+from sqil_core.experiment import ExperimentHandler
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -105,8 +107,8 @@ def create_experiment(
             qop.delay(qubit, opts.spectroscopy_reset_delay)
 
 
-class RRSpec(sqil.experiment.ExperimentHandler):
-    exp_name = "rr_spectroscopy"
+class RRSpec(ExperimentHandler):
+    exp_name = "resonator_spectroscopy"
     db_schema = {
         "data": {"type": "data"},
         "frequencies": {"type": "axis", "plot": "x", "unit": "Hz"},
@@ -128,10 +130,10 @@ class RRSpec(sqil.experiment.ExperimentHandler):
         #     }
         # )
         return create_experiment(
-            self.qpu, self.qpu.qubits[qu_idx], frequencies, options=options
+            self.qpu, self.qpu.quantum_elements[qu_idx], frequencies, options=options
         )
 
-    def analyze(self, result, path, *params, **kwargs):
+    def analyze(self, path, *params, **kwargs):
         data, freq, sweep = sqil.extract_h5_data(
             path, ["data", "frequencies", "sweep0"]
         )
