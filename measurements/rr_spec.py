@@ -122,13 +122,6 @@ class RRSpec(ExperimentHandler):
         *params,
         **kwargs,
     ):
-        # self.qpu.qubits[qu_idx].update(
-        #     **{
-        #         "drive_lo_frequency": 5e9,
-        #         "readout_lo_frequency": 5e9,
-        #         "readout_resonator_frequency": 5e9,
-        #     }
-        # )
         return create_experiment(
             self.qpu, self.qpu.quantum_elements[qu_idx], frequencies, options=options
         )

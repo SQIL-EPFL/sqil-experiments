@@ -160,18 +160,21 @@ class QuSpec(ExperimentHandler):
             fig.savefig(f"{path}/fig.png")
 
         else:
-            fit_mag = sqil.fit.fit_lorentzian(freq, mag)
-            fit_phase = sqil.fit.fit_lorentzian(freq, uphase)
+            fit_both = sqil.fit.fit_two_lorentzians_shared_x0(freq, mag, freq, uphase)
             x_fit = np.linspace(freq[0], freq[1], 500)
 
             fig, axs = plt.subplots(1, 2)
 
             axs[0].plot(freq, mag, "o")
-            axs[0].plot(freq, fit_mag.predict(freq))
+            axs[0].plot(
+                freq, fit_both.predict(freq, freq, *fit_both.params)[: len(freq)]
+            )
             axs[0].set_title(f"Magnitude")
 
             axs[1].plot(freq, uphase, "o")
-            axs[1].plot(freq, fit_phase.predict(freq))
+            axs[1].plot(
+                freq, fit_both.predict(freq, freq, *fit_both.params)[len(freq) :]
+            )
             axs[1].set_title(f"Phase")
 
             fig.suptitle("Qubit specroscopy")
