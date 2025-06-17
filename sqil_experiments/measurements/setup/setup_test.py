@@ -1,3 +1,8 @@
+import os
+
+from helpers.laboneq import print_qpu_signals
+from helpers.sqil_transmon.operations import SqilTransmonOperations
+from helpers.sqil_transmon.qubit import SqilTransmon
 from laboneq import serializers
 from laboneq.contrib.example_helpers.generate_descriptor import generate_descriptor
 from laboneq.contrib.example_helpers.generate_device_setup import generate_device_setup
@@ -8,12 +13,6 @@ from laboneq_applications.qpu_types.tunable_transmon import (
     TunableTransmonQubit,
 )
 
-from helpers.laboneq import print_qpu_signals
-
-from helpers.sqil_transmon.qubit import SqilTransmon
-from helpers.sqil_transmon.operations import SqilTransmonOperations
-import os
-
 # Checklist for every cooldown
 # - update data_folder_name
 # - update the initial_readout_lo_freq, an approximate value is required to run onetone
@@ -22,8 +21,8 @@ initial_readout_lo_freq = 7.2e9
 
 
 # Data storage
-db_root = r"C:\Users\sqil\Desktop\code\sqil-experiments\measurements\data"
-db_root_local = r"C:\Users\sqil\Desktop\code\sqil-experiments\measurements\data_local"
+db_root = r"C:\Users\sqil\Desktop\code\sqil-experiments\data"
+db_root_local = r"C:\Users\sqil\Desktop\code\sqil-experiments\data_local"
 storage = {
     "db_type": "plottr",
     "db_path": os.path.join(db_root, data_folder_name),

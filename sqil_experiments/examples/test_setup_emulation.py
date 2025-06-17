@@ -5,9 +5,8 @@ python -m measurements.helpers.test_setup_programmatic.test_setup_emulation
 
 import sys
 
-from laboneq.simple import Experiment, Session
-
 from examples.leftline_setup import get_device_setup
+from laboneq.simple import Experiment, Session
 
 
 def main():

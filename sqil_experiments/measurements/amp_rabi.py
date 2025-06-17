@@ -1,18 +1,15 @@
-import sqil_core as sqil
-import numpy as np
 import matplotlib.pyplot as plt
-
-from laboneq.dsl.quantum import QPU
-from laboneq_applications.core import validation
-from laboneq.simple import Experiment, SweepParameter, dsl
-from laboneq.dsl.enums import AcquisitionType, AveragingMode
-
-from helpers.sqil_transmon.qubit import SqilTransmon
+import numpy as np
+import sqil_core as sqil
 from helpers.sqil_transmon.operations import SqilTransmonOperations
-
-from laboneq_applications.experiments.options import BaseExperimentOptions
-from laboneq.workflow import option_field, task_options
+from helpers.sqil_transmon.qubit import SqilTransmon
+from laboneq.dsl.enums import AcquisitionType, AveragingMode
+from laboneq.dsl.quantum import QPU
 from laboneq.dsl.quantum.quantum_element import QuantumElement
+from laboneq.simple import Experiment, SweepParameter, dsl
+from laboneq.workflow import option_field, task_options
+from laboneq_applications.core import validation
+from laboneq_applications.experiments.options import BaseExperimentOptions
 from numpy.typing import ArrayLike
 
 
@@ -83,9 +80,7 @@ class AmplitudeRabi(sqil.experiment.ExperimentHandler):
         )
 
     def analyze(self, result, path, *params, **kwargs):
-        data, amps, sweep = sqil.extract_h5_data(
-            path, ["data", "amplitudes", "sweep0"]
-        )
+        data, amps, sweep = sqil.extract_h5_data(path, ["data", "amplitudes", "sweep0"])
         real = np.real(data)
         imag = np.imag(data)
 

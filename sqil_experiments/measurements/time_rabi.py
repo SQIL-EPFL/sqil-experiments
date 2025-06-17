@@ -1,25 +1,22 @@
-import sqil_core as sqil
-from sqil_core.experiment import ExperimentHandler
-import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-
+import numpy as np
+import sqil_core as sqil
+from laboneq.dsl.enums import AcquisitionType, AveragingMode
 from laboneq.dsl.quantum import QPU
+from laboneq.dsl.quantum.quantum_element import QuantumElement
 from laboneq.simple import (
     Experiment,
+    SectionAlignment,
     SweepParameter,
     dsl,
     pulse_library,
-    SectionAlignment,
 )
-from laboneq.dsl.enums import AcquisitionType, AveragingMode
-
+from laboneq.workflow import option_field, task_options
 from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import BaseExperimentOptions
-from laboneq.workflow import option_field, task_options
-
-from laboneq.dsl.quantum.quantum_element import QuantumElement
+from matplotlib.gridspec import GridSpec
 from numpy.typing import ArrayLike
+from sqil_core.experiment import ExperimentHandler
 
 
 @task_options(base_class=BaseExperimentOptions)

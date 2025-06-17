@@ -12,33 +12,24 @@ Provides file-storage tools for the DataDict class.
 I changed DDH5_Writer module 'data_folder'.
 Now each measurement folder will be named by run number, exp_name and time.
 """
-import os
-import logging
-import time
 import datetime
-import uuid
 import json
+import logging
+import os
 import shutil
+import time
+import uuid
 from enum import Enum
-from typing import Any, Union, Optional, Dict, Type, Collection
-from types import TracebackType
 from pathlib import Path
+from types import TracebackType
+from typing import Any, Collection, Dict, Optional, Type, Union
 
-import numpy as np
 import h5py
-
+import numpy as np
+from plottr import QtCore, QtGui, QtWidgets, Signal, Slot
+from plottr.data.datadict import DataDict, DataDictBase, is_meta_key
+from plottr.node import Node, NodeWidget, emitGuiUpdate, updateGuiFromNode, updateOption
 from qcodes.utils import NumpyJSONEncoder
-from plottr import QtGui, Signal, Slot, QtWidgets, QtCore
-
-from plottr.node import (
-    Node,
-    NodeWidget,
-    updateOption,
-    updateGuiFromNode,
-    emitGuiUpdate,
-)
-
-from plottr.data.datadict import DataDict, is_meta_key, DataDictBase
 
 __author__ = "Wolfgang Pfaff"
 __license__ = "MIT"

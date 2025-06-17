@@ -1,7 +1,8 @@
 from pprint import pprint
-import numpy as np
 
+import numpy as np
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
+
 from .utils import shfqa_power_calculator
 
 

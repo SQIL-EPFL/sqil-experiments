@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from helpers.laboneq import shfqa_power_calculator
-
 from typing import TYPE_CHECKING, Literal
 
 import attrs
+from helpers.laboneq import shfqa_power_calculator
 from laboneq.core.utilities.dsl_dataclass_decorator import classformatter
 from laboneq.dsl.calibration import Calibration, Oscillator, SignalCalibration
 from laboneq.dsl.enums import ModulationType
-from laboneq.dsl.quantum import (
-    QuantumElement,
-    QuantumParameters,
-)
+from laboneq.dsl.quantum import QuantumElement, QuantumParameters
 from laboneq.simple import dsl
 
 if TYPE_CHECKING:

@@ -14,22 +14,18 @@ If multiple qubits are passed to the `run` workflow, the above pulses are applie
 in parallel on all the qubits.
 """
 
-import sqil_core as sqil
-from sqil_core.experiment import ExperimentHandler
 import matplotlib.pyplot as plt
 import numpy as np
-
+import sqil_core as sqil
 from laboneq import workflow
-from laboneq.simple import Experiment, SweepParameter, dsl
-
-from laboneq_applications.core.validation import validate_and_convert_qubits_sweeps
-
-
-from laboneq.dsl.quantum.qpu import QPU
-from laboneq_applications.typing import QuantumElements, QubitSweepPoints
-from laboneq_applications.experiments.options import BaseExperimentOptions
-from laboneq.workflow import option_field, task_options
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
+from laboneq.dsl.quantum.qpu import QPU
+from laboneq.simple import Experiment, SweepParameter, dsl
+from laboneq.workflow import option_field, task_options
+from laboneq_applications.core.validation import validate_and_convert_qubits_sweeps
+from laboneq_applications.experiments.options import BaseExperimentOptions
+from laboneq_applications.typing import QuantumElements, QubitSweepPoints
+from sqil_core.experiment import ExperimentHandler
 
 
 @task_options(base_class=BaseExperimentOptions)

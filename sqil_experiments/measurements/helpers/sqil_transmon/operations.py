@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
     from laboneq.dsl.calibration import Calibration
     from laboneq.dsl.parameter import SweepParameter
-
     from laboneq_applications.typing import QuantumElements
 
 # TODO: Implement multistate 0-1-2 measurement operation
