@@ -54,6 +54,8 @@ def generate_zi_setup():
         shfqc=[
             {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
         ],
+        include_flux_lines=False,
+        multiplex_drive_lines=True,
         query_zsync=True,
         query_options=False,
     )
@@ -77,14 +79,28 @@ def generate_qpu(zi_setup):
 
 
 # Instruments
+def setup_lo(self, *args, **kwargs):
+    self.set_frequency(11e9)
+    self.set_power(-20)
+
+
 instruments = {
-    # "sgs": {
-    #     "type": "LO",
-    #     "model": "RohdeSchwarzSGS100A",
-    #     "name": "SGSA100",
-    #     "address": "TCPIP0::192.168.1.201::inst0::INSTR",
-    #     # "connect": lambda self, *args, **kwargs: print("CUSTOM CONNECT TO", self.name),
-    # },
+    "sgs": {
+        "type": "LO",
+        "model": "RohdeSchwarzSGS100A",
+        "name": "SGSA100",
+        "address": "TCPIP0::192.168.1.56::inst0::INSTR",
+        # "connect": lambda self, *args, **kwargs: print("CUSTOM CONNECT TO", self.name),
+        # "setup": setup_lo,
+        "variables": {
+            "frequency": lambda exp: exp.qpu.quantum_elements[
+                0
+            ].parameters.external_lo_frequency,
+            "power": lambda exp: exp.qpu.quantum_elements[
+                0
+            ].parameters.external_lo_power,
+        },
+    },
     "zi": {
         "type": "ZI",
         "address": "localhost",

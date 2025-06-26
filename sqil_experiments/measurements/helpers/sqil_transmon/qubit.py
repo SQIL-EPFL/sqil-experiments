@@ -115,6 +115,8 @@ class SqilTransmonParameters(QuantumParameters):
 
     drive_lo_frequency: float | None = None
     readout_lo_frequency: float | None = None
+    external_lo_frequency: float | None = None
+    external_lo_power: float | None = None
 
     # resonance frequencies
 

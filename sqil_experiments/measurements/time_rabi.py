@@ -70,6 +70,7 @@ def create_experiment(
                     amplitude=1,
                     length=pulse_len + 20e-9,
                     pulse={"can_compress": True, "width": pulse_len},
+                    transition="ge",
                 )
             with dsl.section(name="measure", alignment=SectionAlignment.LEFT):
                 qop.measure(qubit, dsl.handles.result_handle(qubit.uid))
