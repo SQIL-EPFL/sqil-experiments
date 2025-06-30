@@ -56,7 +56,6 @@ def generate_zi_setup():
         ],
         include_flux_lines=False,
         multiplex_drive_lines=True,
-        query_zsync=True,
         query_options=False,
     )
 
@@ -91,14 +90,14 @@ instruments = {
         "name": "SGSA100",
         "address": "TCPIP0::192.168.1.56::inst0::INSTR",
         # "connect": lambda self, *args, **kwargs: print("CUSTOM CONNECT TO", self.name),
-        # "setup": setup_lo,
+        "setup": setup_lo,
         "variables": {
-            "frequency": lambda exp: exp.qpu.quantum_elements[
-                0
-            ].parameters.external_lo_frequency,
-            "power": lambda exp: exp.qpu.quantum_elements[
-                0
-            ].parameters.external_lo_power,
+            "frequency": lambda exp: (
+                exp.qpu.quantum_elements[0].parameters.external_lo_frequency
+            ),
+            "power": lambda exp: (
+                exp.qpu.quantum_elements[0].parameters.external_lo_power
+            ),
         },
     },
     "zi": {
@@ -109,7 +108,6 @@ instruments = {
         "generate_qpu": generate_qpu,
     },
 }
-
 
 # Initialize QPU
 # qubits = TunableTransmonQubit.from_device_setup(zi_setup)
