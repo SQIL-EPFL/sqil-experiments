@@ -32,6 +32,7 @@ class TimeRabiOptions:
         description="Averaging mode.",
         converter=AveragingMode,
     )
+    transition: str = option_field("ge", description="Transition, ge or ef")
 
 
 @dsl.qubit_experiment
@@ -80,8 +81,8 @@ def create_experiment(
 class TimeRabi(ExperimentHandler):
     exp_name = "time_rabi"
     db_schema = {
-        "data": {"type": "data"},
-        "pulse_lengths": {"type": "axis", "plot": "x", "unit": "s"},
+        "data": {"role": "data", "unit": "V"},
+        "pulse_lengths": {"role": "x-axis", "unit": "s"},
     }
 
     def sequence(

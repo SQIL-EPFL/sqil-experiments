@@ -99,8 +99,8 @@ def create_experiment(
 class RRSpec(ExperimentHandler):
     exp_name = "resonator_spectroscopy"
     db_schema = {
-        "data": {"type": "data"},
-        "frequencies": {"type": "axis", "plot": "x", "unit": "Hz"},
+        "data": {"role": "data", "unit": "V"},
+        "frequencies": {"role": "x-axis", "unit": "Hz"},
     }
 
     def sequence(

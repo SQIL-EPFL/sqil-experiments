@@ -21,7 +21,7 @@ initial_readout_lo_freq = 7.2e9
 
 
 # Data storage
-db_root = r"C:\Users\sqil\Desktop\code\sqil-experiments\data"
+db_root = r"Z:\Projects\BottomLoader\data"
 db_root_local = r"C:\Users\sqil\Desktop\code\sqil-experiments\data_local"
 storage = {
     "db_type": "plottr",
