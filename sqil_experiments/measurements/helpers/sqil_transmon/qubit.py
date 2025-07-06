@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 import attrs
+import numpy as np
 from helpers.laboneq import shfqa_power_calculator
 from laboneq.core.utilities.dsl_dataclass_decorator import classformatter
 from laboneq.dsl.calibration import Calibration, Oscillator, SignalCalibration
@@ -123,6 +124,10 @@ class SqilTransmonParameters(QuantumParameters):
     resonance_frequency_ge: float | None = None
     resonance_frequency_ef: float | None = None
     readout_resonator_frequency: float | None = None
+
+    # readout resonator parameters
+    readout_configuration: Literal["reflection", "hanger", "transmission"] | None = None
+    readout_kappa_tot: float | None = None
 
     # g-e drive pulse parameters
 
@@ -248,7 +253,16 @@ class SqilTransmonParameters(QuantumParameters):
             or self.readout_resonator_frequency is None
         ):
             return None
-        return self.readout_resonator_frequency - self.readout_lo_frequency
+        ext_lo = self.external_lo_frequency or 0
+        return self.readout_resonator_frequency - self.readout_lo_frequency - ext_lo
+
+    @property
+    def readout_power(self) -> float | None:
+        return 20 * np.log10(self.readout_amplitude) + self.readout_range_in
+
+    @property
+    def ge_drive_power_pi(self):
+        return 20 * np.log10(self.ge_drive_amplitude_pi) + self.drive_range
 
 
 @classformatter
