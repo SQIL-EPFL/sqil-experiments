@@ -123,13 +123,15 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         if readout:
             signal_line, _ = q.readout_parameters()
             lo_frequency = q.parameters.readout_lo_frequency
+            external_lo_frequency = q.parameters.readout_external_lo_frequency or 0
         else:
             signal_line, _ = q.transition_parameters(transition)
             lo_frequency = q.parameters.drive_lo_frequency
+            external_lo_frequency = 0
 
         if rf:
             # This subtraction works for both numbers and SweepParameters
-            frequency -= lo_frequency
+            frequency -= lo_frequency + external_lo_frequency
 
         if calibration is None:
             calibration = dsl.experiment_calibration()

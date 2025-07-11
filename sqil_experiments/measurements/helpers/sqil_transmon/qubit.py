@@ -116,8 +116,8 @@ class SqilTransmonParameters(QuantumParameters):
 
     drive_lo_frequency: float | None = None
     readout_lo_frequency: float | None = None
-    external_lo_frequency: float | None = None
-    external_lo_power: float | None = None
+    readout_external_lo_frequency: float | None = None
+    readout_external_lo_power: float | None = None
 
     # resonance frequencies
 
@@ -253,12 +253,13 @@ class SqilTransmonParameters(QuantumParameters):
             or self.readout_resonator_frequency is None
         ):
             return None
-        ext_lo = self.external_lo_frequency or 0
+        ext_lo = self.readout_external_lo_frequency or 0
         return self.readout_resonator_frequency - self.readout_lo_frequency - ext_lo
 
     @property
     def readout_power(self) -> float | None:
-        return 20 * np.log10(self.readout_amplitude) + self.readout_range_in
+        ext_power = self.readout_external_lo_power or 0
+        return 20 * np.log10(self.readout_amplitude) + self.readout_range_in + ext_power
 
     @property
     def ge_drive_power_pi(self):
