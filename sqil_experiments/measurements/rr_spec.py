@@ -304,19 +304,24 @@ def rr_spec_analysis(
             sqil.set_plot_style(plt)
             fig2, ax = plt.subplots(1, 1)
             nrmses = np.ones(len(sweeps[0]))
-            last_great, last_idx = None, None
             for i in range(len(sweeps[0])):
                 fit_res = sqil.resonator.linmag_fit(x_data[i, :], y_data[i, :])
                 nrmses[i] = fit_res.metrics["nrmse"]
-                if fit_res.quality(recipe="nrmse") == FitQuality.GREAT:
-                    last_great = sweeps[0][i]
-                    last_idx = i
             anal_res.extra_data.update({"nrmses": nrmses})
-            if last_great is not None:
-                anal_res.updated_params["q0"].update({sweep0_info.id: last_great})
+
+            best_idx = sqil.find_first_minima_idx(nrmses)
+            is_fit_okay = (
+                sqil.fit.evaluate_fit_quality(
+                    {"nrmse": nrmses[best_idx]}, recipe="nrmse"
+                )
+                >= FitQuality.GREAT
+            )
+            if best_idx is not None and is_fit_okay:
+                best_amp = sweeps[0][best_idx]
+                anal_res.updated_params["q0"].update({sweep0_info.id: best_amp})
                 try:
                     anal_res_no_sweep = rr_spec_analysis(
-                        datadict=datadict, qpu=qpu, at_idx=last_idx
+                        datadict=datadict, qpu=qpu, at_idx=best_idx
                     )
                     anal_res.fits.update(anal_res_no_sweep.fits)
                     for qu_id in anal_res.updated_params.keys():
@@ -357,17 +362,17 @@ def rr_spec_analysis(
             ax.set_xlabel(sweep0_info.name_and_unit)
             ax.set_ylabel("NRMSE")
             ax.set_title("Magnitude squared fits")
-            if last_great is not None:
+            if best_idx is not None and is_fit_okay:
                 ax.scatter(
-                    last_great,
-                    nrmses[last_idx],
+                    best_amp,
+                    nrmses[best_idx],
                     color="tab:red",
                     zorder=3,
                     s=400,
                     marker="*",
                     label=f"Selected {str(sweep0_info.name).lower()}",
                 )
-                axs[0].axhline(last_great, color="tab:red", linestyle="--")
+                axs[0].axhline(best_amp, color="tab:red", linestyle="--")
             ax.legend()
             fig2.tight_layout()
             anal_res.figures.update({"fig_best_amp": fig2})
