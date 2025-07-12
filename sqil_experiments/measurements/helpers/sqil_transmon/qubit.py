@@ -182,7 +182,7 @@ class SqilTransmonParameters(QuantumParameters):
     # power range parameters
 
     drive_range: float = 0
-    readout_range_out: float = -30
+    readout_range_out: float = 10
     readout_range_in: float = -20
     ro_power: float = -30
 

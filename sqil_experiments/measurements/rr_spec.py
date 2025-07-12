@@ -156,48 +156,52 @@ class RRSpec(ExperimentHandler):
         # fig.savefig(f"{path}/fig.png")
 
 
+from sqil_core.experiment import AnalysisResult
 from sqil_core.fit import FitQuality
 from sqil_core.utils import *
 
 # map_data_dict, extract_h5_data, param_info_from_schema, enrich_qubit_params, get_relevant_exp_parameters, plot_mag_phase, ONE_TONE_PARAMS, ParamInfo
 
 
-class AnalysisResult:
+def rr_spec_analysis(
+    path=None, datadict=None, qpu=None, at_idx=None, **kwargs
+) -> AnalysisResult:
+    anal_res = AnalysisResult()
 
-    def __init__(
-        self,
-        updated_params: dict,
-        figures: dict,
-        fits: list,
-    ):
-        pass
-
-
-def rr_spec_analysis(path, *args, **kwargs):
-    datadict = extract_h5_data(path, schema=True)
+    if path is None and datadict is None:
+        raise Exception("At least one of `path` and `datadict` must be specified.")
+    if path is not None:
+        datadict = extract_h5_data(path, schema=True)
     schema = datadict["schema"]
 
     x_data, y_data, sweeps, datadict_map = map_data_dict(datadict)
+
+    # Extract qubit parameters
+    qubit_params = {}
+    try:
+        if qpu is None and path is not None:
+            qpu = read_qpu(path, "qpu_old.json")
+        qubit_params = enrich_qubit_params(qpu.quantum_elements[0])
+    except Exception as e:
+        print("Error reading QPU", e)
+    measurement = qubit_params["readout_configuration"].value
+    anal_res.updated_params["q0"] = {}
+    fit_res = None
+
+    if at_idx is not None:
+        x_data, y_data = x_data[at_idx], y_data[at_idx]
+        sweep_key = datadict_map["sweeps"][0]
+        sweep0_info = param_info_from_schema(sweep_key, schema[sweep_key])
+        qubit_params[sweep0_info.id].value = sweeps[0][at_idx]
+
     x_info = param_info_from_schema(
         datadict_map["x_data"], schema[datadict_map["x_data"]]
     )
     y_info = param_info_from_schema(
         datadict_map["y_data"], schema[datadict_map["y_data"]]
     )
-
     x_data_scaled = x_data * x_info.scale
     y_data_scaled = y_data * y_info.scale
-
-    # Extract qubit parameters
-    qubit_params = {}
-    try:
-        qpu = read_qpu(path, "qpu_old.json")
-        qubit_params = enrich_qubit_params(qpu.quantum_elements[0])
-    except Exception as e:
-        print("Error reading QPU", e)
-    measurement = qubit_params["readout_configuration"].value
-    updated_params = {}
-    fit_res = None
 
     has_sweeps = y_data.ndim > 1
 
@@ -214,6 +218,7 @@ def rr_spec_analysis(path, *args, **kwargs):
         # Plot without fit
         sqil.set_plot_style(plt)
         fig, axs = sqil.resonator.plot_resonator(x_data_scaled, y_data_scaled)
+        anal_res.figures.update({"fig": fig})
         # Fix axis names
         axs[0].set_xlabel("In-phase" + y_unit_str)
         axs[0].set_ylabel("Quadrature" + y_unit_str)
@@ -236,8 +241,11 @@ def rr_spec_analysis(path, *args, **kwargs):
                 )
             # Extract parameters
             fr = fit_res.params_by_name["fr"]
-            updated_params["readout_resonator_frequency"] = fr
-            updated_params["readout_kappa_tot"] = fr / fit_res.params_by_name["Q_tot"]
+            anal_res.updated_params["q0"]["readout_resonator_frequency"] = fr
+            anal_res.updated_params["q0"]["readout_kappa_tot"] = (
+                fr / fit_res.params_by_name["Q_tot"]
+            )
+            anal_res.fits.update({"Complex fit": fit_res})
             # Plot
             x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))
             y_fit_scaled = fit_res.predict(x_fit) * y_info.scale
@@ -269,9 +277,10 @@ def rr_spec_analysis(path, *args, **kwargs):
                     raise Exception(
                         f"Fit not acceptable with {fit_res.model_name} model, nrmse = {fit_res.metrics['nrmse']:.4f}"
                     )
-                updated_params["readout_resonator_frequency"] = fit_res.params_by_name[
-                    "x0"
-                ]
+                anal_res.updated_params["q0"]["readout_resonator_frequency"] = (
+                    fit_res.params_by_name["x0"]
+                )
+                anal_res.fits.update({"Magnitude squared fit": fit_res})
                 # Plot
                 x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))
                 y_fit = np.sqrt(fit_res.predict(x_fit)) * np.max(np.abs(y_data))
@@ -283,6 +292,7 @@ def rr_spec_analysis(path, *args, **kwargs):
                 fit_res = None
     else:
         fig, axs = plot_mag_phase(datadict=datadict)
+        anal_res.figures.update({"fig": fig})
 
         sweep_key = datadict_map["sweeps"][0]
         sweep0_info = param_info_from_schema(sweep_key, schema[sweep_key])
@@ -290,7 +300,7 @@ def rr_spec_analysis(path, *args, **kwargs):
             sqil.set_plot_style(plt)
             fig2, ax = plt.subplots(1, 1)
             nrmses = np.ones(len(sweeps[0]))
-            last_great = None
+            last_great, last_idx = None, None
             for i in range(len(sweeps[0])):
                 fit_res = sqil.resonator.linmag_fit(x_data[i, :], y_data[i, :])
                 nrmses[i] = fit_res.metrics["nrmse"]
@@ -298,11 +308,33 @@ def rr_spec_analysis(path, *args, **kwargs):
                     last_great = sweeps[0][i]
                     last_idx = i
             if last_great is not None:
-                updated_params = {
-                    sweep0_info.id: last_great,
-                    "readout_resonator_frequency": fit_res.params_by_name["x0"],
-                }
-            # TODO: recursive step to find frequency?
+                anal_res.updated_params["q0"].update({sweep0_info.id: last_great})
+                try:
+                    anal_res_no_sweep = rr_spec_analysis(
+                        datadict=datadict, qpu=qpu, at_idx=last_idx
+                    )
+                    anal_res.fits.update(anal_res_no_sweep.fits)
+                    for qu_id in anal_res.updated_params.keys():
+                        anal_res.updated_params[qu_id].update(
+                            anal_res_no_sweep.updated_params[qu_id]
+                        )
+                    fig_single = anal_res_no_sweep.figures["fig"]
+                    fig_single.suptitle(
+                        fig_single.get_suptitle().replace(
+                            "resonator spectroscopy", "trace at chosen operating point"
+                        )
+                    )
+                    anal_res.figures.update({"fig single": fig_single})
+                except Exception as e:
+                    anal_res.updated_params["q0"].update(
+                        {
+                            "readout_resonator_frequency": fit_res.params_by_name["x0"],
+                        }
+                    )
+                    print("Error while analyzing the selected single trace", e)
+                finally:
+                    # Reset fit res to avoid plotting it
+                    fit_res = None
 
             ax.plot(sweeps[0], nrmses, ".-", ms=20, color="tab:blue", mfc="tab:blue")
             ax.axhline(
@@ -333,13 +365,16 @@ def rr_spec_analysis(path, *args, **kwargs):
                 axs[0].axhline(last_great, color="tab:red", linestyle="--")
             ax.legend()
             fig2.tight_layout()
+            anal_res.figures.update({"fig_best_amp": fig2})
 
     exp_params = get_relevant_exp_parameters(
         qubit_params, ONE_TONE_PARAMS, datadict_map["sweeps"]
     )
     params_str = ",   ".join([qubit_params[id].symbol_and_value for id in exp_params])
 
-    updated_params_info = {k: ParamInfo(k, v) for k, v in updated_params.items()}
+    updated_params_info = {
+        k: ParamInfo(k, v) for k, v in anal_res.updated_params["q0"].items()
+    }
     update_params_str = ",   ".join(
         [updated_params_info[id].symbol_and_value for id in updated_params_info.keys()]
     )
@@ -349,10 +384,9 @@ def rr_spec_analysis(path, *args, **kwargs):
         fig.text(0.02, -0.02, f"Model: {fit_res.model_name} - {fit_res.quality()}")
     fig.text(0.3, -0.02, "Experiment:   " + params_str, ha="left")
     fig.tight_layout()
-
     # plt.show()
 
-    return updated_params
+    return anal_res
 
 
 # TODO: show single trace plot for chosen frequency
