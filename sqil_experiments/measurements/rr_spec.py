@@ -100,23 +100,27 @@ class RRSpec(ExperimentHandler):
     exp_name = "resonator_spectroscopy"
     db_schema = {
         "data": {"role": "data", "unit": "V", "scale": 1e3},
-        "frequencies": {
+        "readout_resonator_frequency": {
             "role": "x-axis",
             "unit": "Hz",
             "scale": 1e-9,
-        },  # FIXME: changing this name adds an extra dimension to the data ???
+        },  # FIXME: changing this name adds an extra dimension to the data
+        # YES! it must have the same name as he input arguemnt!
     }
 
     def sequence(
         self,
-        frequencies,
+        readout_resonator_frequency: list,
         qu_idx=0,
         options: ResonatorSpectroscopyExperimentOptions | None = None,
         *params,
         **kwargs,
     ):
         return create_experiment(
-            self.qpu, self.qpu.quantum_elements[qu_idx], frequencies, options=options
+            self.qpu,
+            self.qpu.quantum_elements[qu_idx],
+            readout_resonator_frequency,
+            options=options,
         )
 
     def analyze(self, path, *args, **kwargs):
@@ -307,6 +311,7 @@ def rr_spec_analysis(
                 if fit_res.quality(recipe="nrmse") == FitQuality.GREAT:
                     last_great = sweeps[0][i]
                     last_idx = i
+            anal_res.extra_data.update({"nrmses": nrmses})
             if last_great is not None:
                 anal_res.updated_params["q0"].update({sweep0_info.id: last_great})
                 try:
@@ -389,5 +394,4 @@ def rr_spec_analysis(
     return anal_res
 
 
-# TODO: show single trace plot for chosen frequency
 # TODO: add power axis
