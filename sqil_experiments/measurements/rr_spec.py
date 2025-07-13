@@ -308,14 +308,15 @@ def rr_spec_analysis(
                 fit_res = sqil.resonator.linmag_fit(x_data[i, :], y_data[i, :])
                 nrmses[i] = fit_res.metrics["nrmse"]
             anal_res.extra_data.update({"nrmses": nrmses})
-
             best_idx = sqil.find_first_minima_idx(nrmses)
-            is_fit_okay = (
-                sqil.fit.evaluate_fit_quality(
-                    {"nrmse": nrmses[best_idx]}, recipe="nrmse"
+            is_fit_okay = False
+            if best_idx is not None:
+                is_fit_okay = (
+                    sqil.fit.evaluate_fit_quality(
+                        {"nrmse": nrmses[best_idx]}, recipe="nrmse"
+                    )
+                    >= FitQuality.GREAT
                 )
-                >= FitQuality.GREAT
-            )
             if best_idx is not None and is_fit_okay:
                 best_amp = sweeps[0][best_idx]
                 anal_res.updated_params["q0"].update({sweep0_info.id: best_amp})
@@ -342,10 +343,10 @@ def rr_spec_analysis(
                         }
                     )
                     print("Error while analyzing the selected single trace", e)
-                finally:
-                    # Reset fit res to avoid plotting it
-                    fit_res = None
 
+            # Avoid plotting fit res
+            fit_res = None
+            # Plot
             ax.plot(sweeps[0], nrmses, ".-", ms=20, color="tab:blue", mfc="tab:blue")
             ax.axhline(
                 sqil.fit.FIT_QUALITY_THRESHOLDS["nrmse"][0][0],
@@ -378,7 +379,7 @@ def rr_spec_analysis(
             anal_res.figures.update({"fig_best_amp": fig2})
 
     exp_params = get_relevant_exp_parameters(
-        qubit_params, ONE_TONE_PARAMS, datadict_map["sweeps"]
+        qubit_params, ONE_TONE_PARAMS, [sweep0_info.id]
     )
     params_str = ",   ".join([qubit_params[id].symbol_and_value for id in exp_params])
 
