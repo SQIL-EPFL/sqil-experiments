@@ -135,11 +135,7 @@ class SqilTransmonParameters(QuantumParameters):
     ge_drive_amplitude_pi2: float = 0.1
     ge_drive_length: float = 50e-9
     ge_drive_pulse: dict = attrs.field(
-        factory=lambda: {
-            "function": "drag",
-            "beta": 0,
-            "sigma": 0.25,
-        },
+        factory=lambda: {"function": "gaussian_square", "can_compress": True},
     )
 
     # e-f drive pulse parameters
@@ -177,7 +173,7 @@ class SqilTransmonParameters(QuantumParameters):
 
     # reset parameters
 
-    reset_delay_length: float | None = 1e-6
+    reset_delay_length: float | None = 200e-6
 
     # power range parameters
 

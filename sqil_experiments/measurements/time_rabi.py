@@ -65,10 +65,8 @@ def create_experiment(
         with dsl.sweep(name="time_rabi_sweep", parameter=sweep_param) as pulse_len:
             with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
                 qop.prepare_state.omit_section(qubit, state=opts.transition[0])
-                qop.rx(
+                qop.x180(
                     q=qubit,
-                    angle=None,
-                    amplitude=1,
                     length=pulse_len + 20e-9,
                     pulse={"can_compress": True, "width": pulse_len},
                     transition="ge",
@@ -78,11 +76,14 @@ def create_experiment(
                 qop.passive_reset(qubit)
 
 
+from sqil_core.experiment import AnalysisResult
+
+
 class TimeRabi(ExperimentHandler):
     exp_name = "time_rabi"
     db_schema = {
-        "data": {"role": "data", "unit": "V"},
-        "pulse_lengths": {"role": "x-axis", "unit": "s"},
+        "data": {"role": "data", "unit": "V", "scale": 1e3},
+        "pulse_lengths": {"role": "x-axis", "unit": "s", "scale": 1e9},
     }
 
     def sequence(
@@ -100,48 +101,100 @@ class TimeRabi(ExperimentHandler):
             options=options,
         )
 
-    def analyze(self, path, *params, **kwargs):
-        # Read data
-        data, lengths, sweep = sqil.extract_h5_data(
-            path, ["data", "pulse_lengths", "sweep0"]
+    def analyze(
+        self, path, qu_uid="q0", transition="ge", relevant_params=None, **kwargs
+    ):
+        # FIXME: passing qu_uid = qu_uid causes an error, unhashable type: 'numpy.ndarray'
+        return analyze_time_rabi(
+            path=path,
+            qu_uid="q0",
+            transition=transition,
+            relevant_params=relevant_params,
         )
 
-        # Analyze data
-        proj, inv = sqil.fit.transform_data(data, inv_transform=True)
-        fit_res = sqil.fit.fit_decaying_oscillations(lengths, proj)
-        x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
-        inverse_fit = inv(fit_res.predict(x_fit))
 
-        # Make parameters pretty
-        omega_r = sqil.format_number(1 / fit_res.params[4], unit="Hz")
-        t_pi = sqil.format_number(fit_res.metadata["pi_time"], unit="s")
-        tau = sqil.format_number(fit_res.params[1], unit="s")
+from sqil_core.utils import *
 
-        sqil.set_plot_style(plt)
-        fig = plt.figure(figsize=(20, 7), constrained_layout=True)
-        gs = GridSpec(nrows=1, ncols=10, figure=fig, wspace=0.2)
 
-        # Plot the projection
-        ax_proj = fig.add_subplot(gs[:, :6])  # 6/10 width
-        ax_proj.plot(lengths * 1e6, np.real(proj) * 1e3, "o")
-        ax_proj.plot(x_fit * 1e6, fit_res.predict(x_fit) * 1e3, "tab:red")
-        ax_proj.set_xlabel(r"Time [$\mu$s]")
-        ax_proj.set_ylabel("Projection [mV]")
-        ax_proj.set_title(
-            rf"$t_\pi = ${t_pi}  |  $\Omega_R = ${omega_r}  |  $\tau =${tau}"
-        )
+def analyze_time_rabi(
+    path=None,
+    datadict=None,
+    qpu=None,
+    qu_uid="q0",
+    transition="ge",
+    relevant_params=None,
+    **kwargs,
+):
+    # Extract data and metadata
+    all_data, all_info, datadict = get_data_and_info(path=path, datadict=datadict)
+    lengths, y_data, sweeps = all_data
+    x_info, y_info, sweep_info = all_info
 
-        # Plot IQ data
-        ax_iq = fig.add_subplot(gs[:, 6:])  # 4/10 width
-        ax_iq.scatter(0, 0, marker="+", color="black", s=150)
-        ax_iq.plot(data.real * 1e3, data.imag * 1e3, "o")
-        ax_iq.plot(inverse_fit.real * 1e3, inverse_fit.imag * 1e3, "tab:red")
-        ax_iq.set_xlabel("In-Phase [mV]")
-        ax_iq.set_ylabel("Quadrature [mV]")
-        ax_iq.set_aspect(aspect="equal", adjustable="datalim")
+    # Extract qubit parameters
+    if qpu is None and path is not None:
+        qpu = read_qpu(path, "qpu_old.json")
+    qubit_params = {}
+    if qpu is not None:
+        qubit_params = enrich_qubit_params(qpu.quantum_element_by_uid(qu_uid))
 
-        fig.suptitle("Time Rabi")
+    if relevant_params is None:
+        relevant_params = [f"{transition}_drive_amplitude_pi"]
 
-        fig.savefig(f"{path}/time_rabi.png")
+    anal_res = AnalysisResult()
+    anal_res.updated_params["q0"] = {}
+    fit_res = None
 
-        return fit_res.summary()
+    sqil.set_plot_style(plt)
+
+    has_sweeps = y_data.ndim > 1
+
+    if not has_sweeps:
+        try:
+            # Project the data and start plot
+            proj, inv = sqil.fit.transform_data(y_data, inv_transform=True)
+            fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj)
+            anal_res.figures.update({"fig": fig})
+            # Analyze
+            fit_res_exp = sqil.fit.fit_decaying_oscillations(lengths, proj)
+            fit_res_const = sqil.fit.fit_oscillations(lengths, proj)
+            fit_res = sqil.fit.get_best_fit(
+                fit_res_exp, fit_res_const, recipe="nrmse_aic"
+            )
+            x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
+            inverse_fit = inv(fit_res.predict(x_fit))
+
+            # Update parameters
+            anal_res.updated_params["q0"].update(
+                {f"{transition}_drive_length": fit_res.metadata["pi_time"]}
+            )
+
+            # Make parameters pretty
+            omega_r = sqil.format_number(1 / fit_res.params_by_name["T"], unit="Hz")
+            t_pi = sqil.format_number(fit_res.metadata["pi_time"], unit="s")
+
+            # Plot the fit
+            axs[0].plot(
+                x_fit * x_info.scale, fit_res.predict(x_fit) * y_info.scale, "tab:red"
+            )
+            axs[1].plot(
+                inverse_fit.real * y_info.scale,
+                inverse_fit.imag * y_info.scale,
+                "tab:red",
+            )
+        except Exception as e:
+            print("Error while fitting projected data", e)
+
+    elif has_sweeps:
+        fig, axs = plot_mag_phase(datadict=datadict, raw=True)
+
+    finalize_plot(
+        fig,
+        "Time Rabi",
+        fit_res,
+        qubit_params,
+        anal_res.updated_params[qu_uid],
+        sweep_info=sweep_info,
+        relevant_params=relevant_params,
+    )
+
+    return anal_res
