@@ -175,6 +175,7 @@ class QuSpec(ExperimentHandler):
 
         #     fig.suptitle("Qubit specroscopy")
         #     fig.savefig(f"{path}/fig.png")
+        # TODO: Add support for other transitions
         return qu_spec_analysis(path=path, transition="ge")
 
 
@@ -194,47 +195,34 @@ def qu_spec_analysis(
     at_idx=None,
     transition="ge",
     qu_uid="q0",
+    relevant_params=["spectroscopy_amplitude"],
     **kwargs,
 ) -> AnalysisResult:
+    # Prepare analysis result object
     anal_res = AnalysisResult()
-
-    if path is None and datadict is None:
-        raise Exception("At least one of `path` and `datadict` must be specified.")
-    if path is not None:
-        datadict = extract_h5_data(path, schema=True)
-    schema = datadict["schema"]
-
-    x_data, y_data, sweeps, datadict_map = map_data_dict(datadict)
-
-    # Extract qubit parameters
-    qubit_params = {}
-    try:
-        if qpu is None and path is not None:
-            qpu = read_qpu(path, "qpu_old.json")
-        qubit_params = enrich_qubit_params(qpu.quantum_elements[0])
-    except Exception as e:
-        print("Error reading QPU", e)
     anal_res.updated_params[qu_uid] = {}
     fit_res = None
 
-    if at_idx is not None:
-        x_data, y_data = x_data[at_idx], y_data[at_idx]
-        sweep_key = datadict_map["sweeps"][0]
-        sweep0_info = param_info_from_schema(sweep_key, schema[sweep_key])
-        qubit_params[sweep0_info.id].value = sweeps[0][at_idx]
+    # Extract data and metadata
+    all_data, all_info, datadict = get_data_and_info(path=path, datadict=datadict)
+    x_data, y_data, sweeps = all_data
+    x_info, y_info, sweep_info = all_info
 
-    x_info = param_info_from_schema(
-        datadict_map["x_data"], schema[datadict_map["x_data"]]
-    )
-    y_info = param_info_from_schema(
-        datadict_map["y_data"], schema[datadict_map["y_data"]]
-    )
+    # Extract qubit parameters
+    if qpu is None and path is not None:
+        qpu = read_qpu(path, "qpu_old.json")
+    qubit_params = {}
+    if qpu is not None:
+        qubit_params = enrich_qubit_params(qpu.quantum_element_by_uid(qu_uid))
+    anal_res.updated_params[qu_uid] = {}
+    fit_res = None
 
     has_sweeps = y_data.ndim > 1
 
+    sqil.set_plot_style(plt)
+
     if not has_sweeps:
         # Plot without fit
-        sqil.set_plot_style(plt)
         fig, axs = plot_mag_phase(datadict=datadict)
         anal_res.figures.update({"fig": fig})
 
@@ -268,23 +256,15 @@ def qu_spec_analysis(
         anal_res.figures.update({"fig": fig})
         fit_res = None
 
-    exp_params = get_relevant_exp_parameters(
-        qubit_params, TWO_TONE_PARAMS, datadict_map["sweeps"]
+    finalize_plot(
+        fig,
+        f"Qubit spectroscopy ({transition})",
+        fit_res,
+        qubit_params=qubit_params,
+        updated_params=anal_res.updated_params[qu_uid],
+        sweep_info=sweep_info,
+        relevant_params=relevant_params,
     )
-    params_str = ",   ".join([qubit_params[id].symbol_and_value for id in exp_params])
-
-    updated_params_info = {
-        k: ParamInfo(k, v) for k, v in anal_res.updated_params[qu_uid].items()
-    }
-    update_params_str = ",   ".join(
-        [updated_params_info[id].symbol_and_value for id in updated_params_info.keys()]
-    )
-
-    fig.suptitle(f"Qubit spectroscopy ({transition})\n" + update_params_str)
-    if fit_res:
-        fig.text(0.02, -0.02, f"Model: {fit_res.model_name} - {fit_res.quality()}")
-    fig.text(0.4, -0.02, "Experiment:   " + params_str, ha="left")
     fig.tight_layout()
-    # plt.show()
 
     return anal_res
