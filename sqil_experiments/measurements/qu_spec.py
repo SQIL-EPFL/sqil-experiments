@@ -85,8 +85,8 @@ def create_experiment(
 class QuSpec(ExperimentHandler):
     exp_name = "qubit_spectroscopy"
     db_schema = {
-        "data": {"role": "data", "unit": "V"},
-        "frequencies": {"role": "x-axis", "unit": "Hz"},
+        "data": {"role": "data", "unit": "V", "scale": 1e3},
+        "frequencies": {"role": "x-axis", "unit": "Hz", "scale": 1e-9},
     }
 
     def sequence(
@@ -101,77 +101,190 @@ class QuSpec(ExperimentHandler):
             self.qpu, self.qpu.quantum_elements[qu_idx], frequencies, options=options
         )
 
-    def analyze(self, path, *params, **kwargs):
-        data, freq, sweep = sqil.extract_h5_data(
-            path, ["data", "frequencies", "sweep0"]
-        )
-        options = kwargs.get("options", QuSpecOptions())
+    def analyze(self, path, *args, **kwargs):
+        # data, freq, sweep = sqil.extract_h5_data(
+        #     path, ["data", "frequencies", "sweep0"]
+        # )
+        # options = kwargs.get("options", QuSpecOptions())
+        # sqil.set_plot_style(plt)
+
+        # mag = np.abs(data)
+        # uphase = np.unwrap(np.angle(data))
+
+        # if options.averaging_mode == AveragingMode.SINGLE_SHOT:
+        #     fit_mag = sqil.fit.fit_lorentzian(
+        #         freq[0], np.mean(mag[0], axis=0), sigma=np.std(mag[0], axis=0)
+        #     )
+        #     fit_phase = sqil.fit.fit_lorentzian(
+        #         freq[0], np.mean(uphase[0], axis=0), sigma=np.std(uphase[0], axis=0)
+        #     )
+
+        #     fig, axs = plt.subplots(1, 2)
+        #     axs[0].errorbar(
+        #         freq[0],
+        #         np.mean(mag[0], axis=0),
+        #         np.std(mag[0], axis=0),
+        #         fmt="-o",
+        #         color="tab:blue",
+        #         label="Mean with Error",
+        #         ecolor="tab:orange",
+        #         capsize=5,
+        #         capthick=2,
+        #         elinewidth=2,
+        #         markersize=5,
+        #     )
+        #     axs[0].plot(freq[0], fit_mag.predict(freq[0]), "red")
+        #     axs[0].set_title(f"Magnitude")
+
+        #     axs[1].errorbar(
+        #         freq[0],
+        #         np.mean(uphase[0], axis=0),
+        #         np.std(uphase[0], axis=0),
+        #         fmt="-o",
+        #         color="tab:blue",
+        #         label="Mean with Error",
+        #         ecolor="tab:orange",
+        #         capsize=5,
+        #         capthick=2,
+        #         elinewidth=2,
+        #         markersize=5,
+        #     )
+        #     axs[1].plot(freq[0], fit_phase.predict(freq[0]), "red")
+        #     axs[1].set_title(f"Phase")
+
+        #     fig.suptitle("Qubit specroscopy")
+        #     fig.savefig(f"{path}/fig.png")
+
+        # else:
+        #     fit_both = sqil.fit.fit_two_lorentzians_shared_x0(freq, mag, freq, uphase)
+        #     x_fit = np.linspace(freq[0], freq[1], 500)
+
+        #     fig, axs = plt.subplots(1, 2)
+
+        #     axs[0].plot(freq, mag, "o")
+        #     axs[0].plot(
+        #         freq, fit_both.predict(freq, freq, *fit_both.params)[: len(freq)]
+        #     )
+        #     axs[0].set_title(f"Magnitude")
+
+        #     axs[1].plot(freq, uphase, "o")
+        #     axs[1].plot(
+        #         freq, fit_both.predict(freq, freq, *fit_both.params)[len(freq) :]
+        #     )
+        #     axs[1].set_title(f"Phase")
+
+        #     fig.suptitle("Qubit specroscopy")
+        #     fig.savefig(f"{path}/fig.png")
+        return qu_spec_analysis(path=path, transition="ge")
+
+
+from sqil_core.experiment import AnalysisResult
+from sqil_core.fit import FitQuality
+from sqil_core.utils import *
+
+from sqil_experiments.analysis.fit import find_shared_peak
+
+# map_data_dict, extract_h5_data, param_info_from_schema, enrich_qubit_params, get_relevant_exp_parameters, plot_mag_phase, ONE_TONE_PARAMS, ParamInfo
+
+
+def qu_spec_analysis(
+    path=None,
+    datadict=None,
+    qpu=None,
+    at_idx=None,
+    transition="ge",
+    qu_uid="q0",
+    **kwargs,
+) -> AnalysisResult:
+    anal_res = AnalysisResult()
+
+    if path is None and datadict is None:
+        raise Exception("At least one of `path` and `datadict` must be specified.")
+    if path is not None:
+        datadict = extract_h5_data(path, schema=True)
+    schema = datadict["schema"]
+
+    x_data, y_data, sweeps, datadict_map = map_data_dict(datadict)
+
+    # Extract qubit parameters
+    qubit_params = {}
+    try:
+        if qpu is None and path is not None:
+            qpu = read_qpu(path, "qpu_old.json")
+        qubit_params = enrich_qubit_params(qpu.quantum_elements[0])
+    except Exception as e:
+        print("Error reading QPU", e)
+    anal_res.updated_params[qu_uid] = {}
+    fit_res = None
+
+    if at_idx is not None:
+        x_data, y_data = x_data[at_idx], y_data[at_idx]
+        sweep_key = datadict_map["sweeps"][0]
+        sweep0_info = param_info_from_schema(sweep_key, schema[sweep_key])
+        qubit_params[sweep0_info.id].value = sweeps[0][at_idx]
+
+    x_info = param_info_from_schema(
+        datadict_map["x_data"], schema[datadict_map["x_data"]]
+    )
+    y_info = param_info_from_schema(
+        datadict_map["y_data"], schema[datadict_map["y_data"]]
+    )
+
+    has_sweeps = y_data.ndim > 1
+
+    if not has_sweeps:
+        # Plot without fit
         sqil.set_plot_style(plt)
+        fig, axs = plot_mag_phase(datadict=datadict)
+        anal_res.figures.update({"fig": fig})
 
-        mag = np.abs(data)
-        uphase = np.unwrap(np.angle(data))
-
-        if options.averaging_mode == AveragingMode.SINGLE_SHOT:
-            fit_mag = sqil.fit.fit_lorentzian(
-                freq[0], np.mean(mag[0], axis=0), sigma=np.std(mag[0], axis=0)
+        # Fit data to extract parameters
+        try:
+            is_wide_range = x_data[-1] - x_data[0] > 200e6
+            mag, phase = np.abs(y_data), np.unwrap(np.angle(y_data))
+            fit_res, trace = find_shared_peak(x_data, mag, phase, full_output=True)
+        except Exception as e:
+            print(f"Error while fitting", e)
+        if fit_res is not None:
+            anal_res.fits.update({"Combined mag-phase fit": fit_res})
+            param_id = f"resonance_frequency_{transition}"
+            anal_res.updated_params[qu_uid].update(
+                {param_id: fit_res.params_by_name["x0"]}
             )
-            fit_phase = sqil.fit.fit_lorentzian(
-                freq[0], np.mean(uphase[0], axis=0), sigma=np.std(uphase[0], axis=0)
-            )
+            x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))
 
-            fig, axs = plt.subplots(1, 2)
-            axs[0].errorbar(
-                freq[0],
-                np.mean(mag[0], axis=0),
-                np.std(mag[0], axis=0),
-                fmt="-o",
-                color="tab:blue",
-                label="Mean with Error",
-                ecolor="tab:orange",
-                capsize=5,
-                capthick=2,
-                elinewidth=2,
-                markersize=5,
-            )
-            axs[0].plot(freq[0], fit_mag.predict(freq[0]), "red")
-            axs[0].set_title(f"Magnitude")
+            if trace in ["mag", "phase"]:
+                y_fit_scaled = fit_res.predict(x_fit) * y_info.scale
+                ax_idx = 0 if trace == "mag" else 1
+                axs[ax_idx].plot(x_fit * x_info.scale, y_fit_scaled, color="tab:red")
+            elif trace == "both":
+                y_fit = fit_res.predict(x_fit, x_fit, *fit_res.params)
+                y_fit_mag = y_fit[: len(x_fit)] * y_info.scale
+                y_fit_phase = y_fit[len(x_fit) :]
+                axs[0].plot(x_fit * x_info.scale, y_fit_mag, color="tab:red")
+                axs[1].plot(x_fit * x_info.scale, y_fit_phase, color="tab:red")
+    else:
+        fig, axs = plot_mag_phase(datadict=datadict)
+        anal_res.figures.update({"fig": fig})
+        fit_res = None
 
-            axs[1].errorbar(
-                freq[0],
-                np.mean(uphase[0], axis=0),
-                np.std(uphase[0], axis=0),
-                fmt="-o",
-                color="tab:blue",
-                label="Mean with Error",
-                ecolor="tab:orange",
-                capsize=5,
-                capthick=2,
-                elinewidth=2,
-                markersize=5,
-            )
-            axs[1].plot(freq[0], fit_phase.predict(freq[0]), "red")
-            axs[1].set_title(f"Phase")
+    exp_params = get_relevant_exp_parameters(
+        qubit_params, TWO_TONE_PARAMS, datadict_map["sweeps"]
+    )
+    params_str = ",   ".join([qubit_params[id].symbol_and_value for id in exp_params])
 
-            fig.suptitle("Qubit specroscopy")
-            fig.savefig(f"{path}/fig.png")
+    updated_params_info = {
+        k: ParamInfo(k, v) for k, v in anal_res.updated_params[qu_uid].items()
+    }
+    update_params_str = ",   ".join(
+        [updated_params_info[id].symbol_and_value for id in updated_params_info.keys()]
+    )
 
-        else:
-            fit_both = sqil.fit.fit_two_lorentzians_shared_x0(freq, mag, freq, uphase)
-            x_fit = np.linspace(freq[0], freq[1], 500)
+    fig.suptitle(f"Qubit spectroscopy ({transition})\n" + update_params_str)
+    if fit_res:
+        fig.text(0.02, -0.02, f"Model: {fit_res.model_name} - {fit_res.quality()}")
+    fig.text(0.4, -0.02, "Experiment:   " + params_str, ha="left")
+    fig.tight_layout()
+    # plt.show()
 
-            fig, axs = plt.subplots(1, 2)
-
-            axs[0].plot(freq, mag, "o")
-            axs[0].plot(
-                freq, fit_both.predict(freq, freq, *fit_both.params)[: len(freq)]
-            )
-            axs[0].set_title(f"Magnitude")
-
-            axs[1].plot(freq, uphase, "o")
-            axs[1].plot(
-                freq, fit_both.predict(freq, freq, *fit_both.params)[len(freq) :]
-            )
-            axs[1].set_title(f"Phase")
-
-            fig.suptitle("Qubit specroscopy")
-            fig.savefig(f"{path}/fig.png")
+    return anal_res

@@ -1,27 +1,19 @@
+from typing import Literal
+
 import sqil_core as sqil
+from sqil_core.fit import FitQuality, FitResult
 
 
-def fit_lorentzian_or_gaussian(x_data, y_data, tol=0.1):
-    # Try to find the peak
-    # x0, fwhm, peak_height, y0, is_peak = sqil.fit.estimate_peak(x_data, y_data)
-    # If the peak is not tall enough return
-    # if np.abs(peak_height / np.median(y_data)) < tol:
-    #     return None
-
+def fit_lorentzian_or_gaussian(x_data, y_data) -> FitResult:
     fit_lor = sqil.fit.fit_lorentzian(x_data, y_data)
     fit_gauss = sqil.fit.fit_gaussian(x_data, y_data)
-
-    # Find the best model
-    delta_aic = fit_lor.metrics["aic"] - fit_gauss.metrics["aic"]
-    if delta_aic >= 0:
-        print(f"Gaussian fit is better   ΔAIC = {delta_aic:.4f}")
-        return fit_gauss
-    print(f"Lorentzian fit is better ΔAIC = {delta_aic:.4f}")
-    return fit_lor
+    return sqil.fit.get_best_fit(fit_lor, fit_gauss, recipe="nrmse_aic")
 
 
-def find_peaked_resonance(freq, mag, phase):
+def find_shared_peak(freq, mag, phase, full_output=False) -> FitResult:
     fit_res = None
+    selected_fit_trace: Literal["both", "mag", "phase"] | None = "both"
+
     fit_mag = fit_lorentzian_or_gaussian(freq, mag)
     fit_phase = fit_lorentzian_or_gaussian(freq, phase)
 
@@ -29,7 +21,7 @@ def find_peaked_resonance(freq, mag, phase):
     nrmse_phase = fit_phase.metrics["nrmse"]
 
     # If both single fits have acceptable error
-    if nrmse_mag < 0.1 and nrmse_phase < 0.1:
+    if fit_mag.is_acceptable("nrmse") and fit_phase.is_acceptable("nrmse"):
         is_mag_lorentzian = fit_mag.model_name == "lorentzian"
         is_phase_lorentzian = fit_phase.model_name == "lorentzian"
         # If both fit best as loretzians, fit a lorentzian with a shared x0
@@ -40,11 +32,11 @@ def find_peaked_resonance(freq, mag, phase):
             fit_res = sqil.fit.fit_two_gaussians_shared_x0(freq, mag, freq, phase)
         # Otherwise, fit both using the model that fits best one of them
         else:
-            lorentzian_dominates = (
-                is_mag_lorentzian
-                if nrmse_mag - nrmse_phase < 0
-                else is_phase_lorentzian
-            )
+            # Check if the lorentzian or gaussian model dominate on one side
+            if nrmse_mag - nrmse_phase < 0:
+                lorentzian_dominates = is_mag_lorentzian
+            else:
+                lorentzian_dominates = is_phase_lorentzian
             print(
                 "Lorentzian domninates"
                 if lorentzian_dominates
@@ -60,13 +52,18 @@ def find_peaked_resonance(freq, mag, phase):
                 fit_res = sqil.fit.fit_two_gaussians_shared_x0(freq, mag, freq, phase)
 
         # Check the nrmse of the shared fit. If bad return the best single fit
-        if fit_res.metrics["nrmse"] > 0.1:
+        if not fit_res.is_acceptable("nrmse"):
             fit_res = fit_mag if nrmse_mag < nrmse_phase else fit_phase
 
     # In case only one fit has acceptable error, return that
-    elif nrmse_mag < 0.1:
+    elif fit_mag.is_acceptable("nrmse"):
         fit_res = fit_mag
-    elif nrmse_phase < 0.1:
+        selected_fit_trace = "mag"
+    elif fit_phase.is_acceptable("nrmse"):
         fit_res = fit_phase
+        selected_fit_trace = "phase"
+    else:
+        fit_res = None
+        selected_fit_trace = None
 
-    return fit_res
+    return fit_res if not full_output else (fit_res, selected_fit_trace)
