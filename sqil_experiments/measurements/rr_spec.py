@@ -173,7 +173,7 @@ def rr_spec_analysis(
     qpu=None,
     at_idx=None,
     relevant_params=ONE_TONE_PARAMS,
-    qu_uid=0,
+    qu_uid="q0",
     **kwargs,
 ) -> AnalysisResult:
     # Prepare analysis result object
@@ -191,7 +191,7 @@ def rr_spec_analysis(
         qpu = read_qpu(path, "qpu_old.json")
     qubit_params = {}
     if qpu is not None:
-        qubit_params = enrich_qubit_params(qpu.quantum_elements[qu_uid])
+        qubit_params = enrich_qubit_params(qpu.quantum_element_by_uid(qu_uid))
 
     measurement = qubit_params["readout_configuration"].value
 
