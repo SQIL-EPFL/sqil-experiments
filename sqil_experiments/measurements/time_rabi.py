@@ -189,7 +189,7 @@ def analyze_time_rabi(
 
     finalize_plot(
         fig,
-        "Time Rabi",
+        f"Time Rabi ({transition})",
         fit_res,
         qubit_params,
         anal_res.updated_params[qu_uid],
