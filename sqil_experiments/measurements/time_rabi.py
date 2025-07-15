@@ -141,7 +141,7 @@ def analyze_time_rabi(
         relevant_params = [f"{transition}_drive_amplitude_pi"]
 
     anal_res = AnalysisResult()
-    anal_res.updated_params["q0"] = {}
+    anal_res.updated_params[qu_uid] = {}
     fit_res = None
 
     sqil.set_plot_style(plt)
@@ -160,13 +160,16 @@ def analyze_time_rabi(
             fit_res = sqil.fit.get_best_fit(
                 fit_res_exp, fit_res_const, recipe="nrmse_aic"
             )
-            x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
-            inverse_fit = inv(fit_res.predict(x_fit))
 
+            anal_res.fits.update({"Decaying oscillations": fit_res_exp})
+            anal_res.fits.update({"Constant oscillations": fit_res_const})
             # Update parameters
-            anal_res.updated_params["q0"].update(
+            anal_res.updated_params[qu_uid].update(
                 {f"{transition}_drive_length": fit_res.metadata["pi_time"]}
             )
+
+            x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
+            inverse_fit = inv(fit_res.predict(x_fit))
 
             # Make parameters pretty
             omega_r = sqil.format_number(1 / fit_res.params_by_name["T"], unit="Hz")
