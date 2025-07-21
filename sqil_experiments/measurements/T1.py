@@ -237,7 +237,7 @@ def analyze_T1(
     T1 = fit_res.params_by_name["tau"]
     anal_res.updated_params[qu_uid].update({f"{transition}_T1": T1})
     if transition == "ge":
-        anal_res.updated_params[qu_uid].update({"reset_delay_length": 5 * T1})
+        anal_res.updated_params[qu_uid].update({"reset_delay_length": 5.01 * T1})
 
     # Plot the fit
     axs[0].plot(x_fit * x_info.scale, fit_res.predict(x_fit) * y_info.scale, "tab:red")
