@@ -200,6 +200,7 @@ class Ramsey(ExperimentHandler):
     def analyze(
         self,
         path,
+        *args,
         datadict=None,
         qpu=None,
         qu_uid="q0",
@@ -249,22 +250,41 @@ def analyze_ramsey(
     fig, axs, proj, inv = sqil.plot_projection_IQ(datadict=datadict, full_output=True)
     anal_res.figures.update({"fig": fig})
 
-    # Fit exponential
-    fit_res = sqil.fit.fit_decaying_oscillations(x_data, proj)
-    x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
-    inverse_fit = inv(fit_res.predict(x_fit))
+    # Try to fit the sum of 1, 2 and 3 decaying oscillations and see which one fits best
+    best_fit = None
+    n_oscillation = [1, 2, 3]
+    for n in n_oscillation:
+        try:
+            fit_res = sqil.fit.fit_many_decaying_oscillations(x_data, proj, n)
+        except:
+            fit_res = None
+        if fit_res is not None:
+            if best_fit is None:
+                best_fit = fit_res
+                continue
+            best_fit = sqil.fit.get_best_fit(best_fit, fit_res, recipe="nrmse_aic")
 
-    # Update parameters
-    T2_star = fit_res.params_by_name["tau"]
-    anal_res.updated_params[qu_uid].update({f"{transition}_T2_star": T2_star})
+    if best_fit is not None:
+        # Update parameters
+        taus = [
+            fit_res.params_by_name.get(f"tau{n}", np.inf)
+            for n in range(len(n_oscillation))
+        ]
+        T2_star = np.min(taus)
+        anal_res.updated_params[qu_uid].update({f"{transition}_T2_star": T2_star})
 
-    # Plot the fit
-    axs[0].plot(x_fit * x_info.scale, fit_res.predict(x_fit) * y_info.scale, "tab:red")
-    axs[1].plot(
-        inverse_fit.real * y_info.scale,
-        inverse_fit.imag * y_info.scale,
-        "tab:red",
-    )
+        x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
+        inverse_fit = inv(best_fit.predict(x_fit))
+
+        # Plot the fit
+        axs[0].plot(
+            x_fit * x_info.scale, best_fit.predict(x_fit) * y_info.scale, "tab:red"
+        )
+        axs[1].plot(
+            inverse_fit.real * y_info.scale,
+            inverse_fit.imag * y_info.scale,
+            "tab:red",
+        )
 
     finalize_plot(
         fig,
