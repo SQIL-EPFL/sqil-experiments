@@ -103,6 +103,9 @@ class SqilTransmonParameters(QuantumParameters):
             Offset voltage for flux control line - defaults to 0.
     """
 
+    # Helper parameter used to repeat experiments
+    index: int = 0
+
     # qubit coherence times
 
     ge_T1: float = 0  # noqa: N815
