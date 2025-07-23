@@ -92,6 +92,7 @@ class QuSpec(ExperimentHandler):
     def sequence(
         self,
         frequencies,
+        transition="ge",
         qu_idx=0,
         options: QuSpecOptions | None = None,
         *params,
@@ -176,7 +177,7 @@ class QuSpec(ExperimentHandler):
         #     fig.suptitle("Qubit specroscopy")
         #     fig.savefig(f"{path}/fig.png")
         # TODO: Add support for other transitions
-        return qu_spec_analysis(path=path, transition="ge")
+        return qu_spec_analysis(path=path, **kwargs)
 
 
 from sqil_core.experiment import AnalysisResult
@@ -242,8 +243,11 @@ def qu_spec_analysis(
             x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))
 
             if trace in ["mag", "phase"]:
-                y_fit_scaled = fit_res.predict(x_fit) * y_info.scale
-                ax_idx = 0 if trace == "mag" else 1
+                ax_idx = 1
+                y_fit_scaled = fit_res.predict(x_fit)
+                if trace == "mag":
+                    ax_idx = 0
+                    y_fit_scaled *= y_info.scale
                 axs[ax_idx].plot(x_fit * x_info.scale, y_fit_scaled, color="tab:red")
             elif trace == "both":
                 y_fit = fit_res.predict(x_fit, x_fit, *fit_res.params)

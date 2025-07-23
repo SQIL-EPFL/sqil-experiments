@@ -193,6 +193,7 @@ class T1(ExperimentHandler):
             qu_uid=qu_uid,
             transition=transition,
             relevant_params=relevant_params,
+            **kwargs,
         )
 
 

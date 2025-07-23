@@ -110,6 +110,7 @@ class TimeRabi(ExperimentHandler):
             qu_uid="q0",
             transition=transition,
             relevant_params=relevant_params,
+            **kwargs,
         )
 
 
