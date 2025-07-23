@@ -16,6 +16,7 @@ isort = "==5.9.3"
 plottr = ">=0.14.0,<0.15.0"
 laboneq = ">=2.53.0,<3.0.0"
 laboneq-applications = ">=2.7.0,<3.0.0"
+sqil-core = "^1.1.0"
 
 
 [build-system]
