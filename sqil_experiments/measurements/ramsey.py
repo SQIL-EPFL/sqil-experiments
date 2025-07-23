@@ -286,6 +286,28 @@ def analyze_ramsey(
             "tab:red",
         )
 
+    # Plot FFT
+    x_fft, y_fft = sqil.compute_fft(x_data, proj)
+    x_peaks, y_peaks = sqil.get_peaks(x_fft, y_fft)
+    sqil.set_plot_style(plt)
+    fig2, ax2 = plt.subplots(1, 1)
+    ax2.plot(x_fft / 1e6, y_fft)
+    ax2.scatter(
+        x_peaks / 1e6,
+        y_peaks,
+        color="tab:red",
+        marker="x",
+        zorder=3,
+        s=100,
+        label="Peaks",
+    )
+    ax2.set_xlabel("Frequency [MHz]")
+    ax2.set_ylabel("FFT amplitude")
+    ax2.set_title("Fourier transform")
+    ax2.legend()
+    fig2.tight_layout()
+    anal_res.figures.update({"fft": fig2})
+
     finalize_plot(
         fig,
         f"Ramsey ({transition})",
