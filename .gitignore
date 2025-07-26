@@ -169,3 +169,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+laboneq_output/
+data_local/
+data
+
+# Files ending in _dev
+*_dev.*
