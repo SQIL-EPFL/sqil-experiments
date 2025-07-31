@@ -196,6 +196,9 @@ class SqilTransmonParameters(QuantumParameters):
         },
     )
 
+    # current parameters
+    current: float | None = None
+
     # flux parameters
 
     dc_slot: int | None = 0

@@ -12,6 +12,7 @@ from laboneq_applications.qpu_types.tunable_transmon import (
     TunableTransmonOperations,
     TunableTransmonQubit,
 )
+from sqil_core.experiment import bind_instrument_qubit
 
 # Checklist for every cooldown
 # - update data_folder_name
@@ -106,6 +107,16 @@ instruments = {
         # "descriptor": zi_descriptor,
         "generate_setup": generate_zi_setup,
         "generate_qpu": generate_qpu,
+    },
+    "yoko0": {
+        "type": "CS",
+        "model": "Yokogawa_GS200",
+        "address": "TCPIP0::192.168.1.199::inst0::INSTR",
+        "name": "yoko0",
+        "variables": {
+            #      "current": lambda exp: (exp.qpu.quantum_elements[0].parameters.current),
+            "current": bind_instrument_qubit("current", "q0")
+        },
     },
 }
 
