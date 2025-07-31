@@ -171,37 +171,53 @@ def rr_spec_analysis(
     path=None,
     datadict=None,
     qpu=None,
-    at_idx=None,
+    at_sweep_idx=None,
     relevant_params=ONE_TONE_PARAMS,
-    qu_uid="q0",
+    qu_id=None,
     **kwargs,
 ) -> AnalysisResult:
+    if qu_id:
+        print(f"Analyzing qubit {qu_id}")
+
     # Prepare analysis result object
-    anal_res = AnalysisResult()
-    anal_res.updated_params[qu_uid] = {}
-    fit_res = None
+    results_by_qubit: dict[str, AnalysisResult] = kwargs.get("results_by_qubit", {})
 
     # Extract data and metadata
-    all_data, all_info, datadict = get_data_and_info(path=path, datadict=datadict)
-    x_data, y_data, sweeps = all_data
-    x_info, y_info, sweep_info = all_info
-
+    all_data, all_info, datadict, all_qu_ids = get_data_and_info(path, datadict)
     # Extract qubit parameters
     if qpu is None and path is not None:
         qpu = read_qpu(path, "qpu_old.json")
+
+    if qu_id is None and all_qu_ids is not None and len(all_qu_ids) > 1:
+        fun_kwargs = locals().copy()
+        fun_kwargs.update(fun_kwargs.pop("kwargs", {}))
+        for id in all_qu_ids:
+            fun_kwargs["qu_ids"] = [id]
+            res = rr_spec_analysis(**fun_kwargs, results_by_qubit=results_by_qubit)
+            return results_by_qubit.update(res)
+
+    # Prepare analysis result object
+    anal_res = AnalysisResult()
+    anal_res.updated_params[qu_id] = {}
+    fit_res = None
+
+    qu_data, qu_info = all_data[qu_id], all_info[qu_id]
+    x_data, y_data, sweeps = qu_data[qu_id]
+    x_info, y_info, sweep_info = qu_info[qu_id]
+
     qubit_params = {}
     if qpu is not None:
-        qubit_params = enrich_qubit_params(qpu.quantum_element_by_uid(qu_uid))
+        qubit_params = enrich_qubit_params(qpu.quantum_element_by_uid(qu_id))
 
     measurement = qubit_params["readout_configuration"].value
 
     # Check if data has sweeps
     has_sweeps = y_data.ndim > 1
-    if at_idx is not None:
+    if at_sweep_idx is not None:
         has_sweeps = False
-        x_data, y_data = x_data[at_idx], y_data[at_idx]
-        all_data = x_data, y_data, sweeps
-        qubit_params[sweep_info[0].id].value = sweeps[0][at_idx]
+        x_data, y_data = x_data[at_sweep_idx], y_data[at_sweep_idx]
+        qu_data = x_data, y_data, sweeps
+        qubit_params[sweep_info[0].id].value = sweeps[0][at_sweep_idx]
 
     # Rescale data
     x_data_scaled = x_data * x_info.scale
@@ -214,7 +230,7 @@ def rr_spec_analysis(
         # If dB convert to linear magnitude for the fit
         if y_unit == "dB":
             y_data = 10 ** (np.abs(y_data) / 20) * np.exp(1j * np.angle(y_data))
-            all_data = (x_data, y_data, sweeps)
+            qu_data = (x_data, y_data, sweeps)
             y_unit = "V"
         y_unit_str = f" [{y_info.rescaled_unit}]" if y_unit else ""
 
@@ -230,16 +246,14 @@ def rr_spec_analysis(
         # Try complex model fit
         try:
             fit_res = analyze_rr_complex_data(
-                anal_res, all_data, all_info, measurement, axs, qu_uid
+                anal_res, qu_data, qu_info, measurement, axs, qu_id
             )
         except Exception as e:
             print(f"Error fitting the complex resonator data:", e)
             print(f"Trying to fit just the magnitude")
             # Fallback to linmag squared fit
             try:
-                fit_res = analyze_rr_magnitude(
-                    anal_res, all_data, all_info, axs, qu_uid
-                )
+                fit_res = analyze_rr_magnitude(anal_res, qu_data, qu_info, axs, qu_id)
             except Exception as e2:
                 print(f"Error fitting the magnitude:", e2)
                 fit_res = None
@@ -252,7 +266,7 @@ def rr_spec_analysis(
             # Try to extract the optimal readout amplitude
             # If the optimal amplitude is found, run rr_spec_analysis on the chosen trace
             analyze_rr_amplitude_sweep(
-                anal_res, all_data, all_info, datadict, qpu, axs, qu_uid
+                anal_res, qu_data, qu_info, datadict, qpu, axs, qu_id
             )
             fit_res = None
 
@@ -261,7 +275,7 @@ def rr_spec_analysis(
         "Readout resonator spectroscopy",
         fit_res=fit_res,
         qubit_params=qubit_params,
-        updated_params=anal_res.updated_params[qu_uid],
+        updated_params=anal_res.updated_params[qu_id],
         sweep_info=sweep_info,
         relevant_params=relevant_params,
     )
@@ -410,7 +424,7 @@ def analyze_rr_amplitude_sweep(
         anal_res.updated_params[qu_uid].update({sweep0_info.id: best_amp})
         try:
             anal_res_no_sweep = rr_spec_analysis(
-                datadict=datadict, qpu=qpu, at_idx=best_idx
+                datadict=datadict, qpu=qpu, at_sweep_idx=best_idx
             )
             anal_res.fits.update(anal_res_no_sweep.fits)
             for qu_id in anal_res.updated_params.keys():
