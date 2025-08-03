@@ -177,3 +177,6 @@ data
 
 # Files ending in _dev
 *_dev.*
+
+# Config file
+config.yaml
