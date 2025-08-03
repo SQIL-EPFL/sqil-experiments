@@ -160,61 +160,37 @@ class RRSpec(ExperimentHandler):
         #         fig, ax = plt.subplots(1, 1)
         #         ax.pcolormesh(freq, sweep, np.abs(data))
 
-        return rr_spec_analysis(path, *args, **kwargs)
+        return rr_spec_analysis(path=path, **kwargs)
         # fig.savefig(f"{path}/fig.png")
 
 
-from sqil_core.experiment import AnalysisResult
+from sqil_core.experiment import AnalysisResult, multi_qubit_handler
 from sqil_core.fit import FitQuality
 from sqil_core.utils import *
 
 # map_data_dict, extract_h5_data, param_info_from_schema, enrich_qubit_params, get_relevant_exp_parameters, plot_mag_phase, ONE_TONE_PARAMS, ParamInfo
 
 
+@multi_qubit_handler
 def rr_spec_analysis(
-    path=None,
-    datadict=None,
+    datadict,
+    qu_id="q0",
     qpu=None,
     at_sweep_idx=None,
     relevant_params=ONE_TONE_PARAMS,
-    qu_id=None,
     **kwargs,
 ) -> AnalysisResult:
-    if qu_id:
-        print(f"Analyzing qubit {qu_id}")
-
     # Prepare analysis result object
-    results_by_qubit: dict[str, AnalysisResult] = kwargs.get("results_by_qubit", {})
+    anal_res: AnalysisResult = AnalysisResult()
+    anal_res.updated_params[qu_id] = {}
 
     # Extract data and metadata
-    all_data, all_info, datadict = get_data_and_info(path, datadict)
-
-    # Extract qubit parameters
-    if qpu is None and path is not None:
-        qpu = read_qpu(path, "qpu_old.json")
-
-    if qu_id is None:
-        fun_kwargs = locals().copy()
-        fun_kwargs.update(fun_kwargs.pop("kwargs", {}))
-        for id in datadict.keys():
-            fun_kwargs["qu_id"] = id
-            fun_kwargs["results_by_qubit"] = results_by_qubit
-            res = rr_spec_analysis(**fun_kwargs)
-            return results_by_qubit.update({id: res})
-
-    # Prepare analysis result object
-    anal_res = AnalysisResult()
-    anal_res.updated_params[qu_id] = {}
-    fit_res = None
-
-    qu_data, qu_info = all_data[qu_id], all_info[qu_id]
+    qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
     x_data, y_data, sweeps = qu_data
     x_info, y_info, sweep_info = qu_info
 
-    qubit_params = {}
-    if qpu is not None:
-        qubit_params = enrich_qubit_params(qpu[qu_id])
-
+    fit_res = None
+    qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
     measurement = qubit_params["readout_configuration"].value
 
     # Check if data has sweeps
@@ -242,7 +218,7 @@ def rr_spec_analysis(
 
         # Plot without fit
         fig, axs = sqil.resonator.plot_resonator(x_data_scaled, y_data_scaled)
-        anal_res.figures.update({f"{qu_id}_fig": fig})
+        anal_res.add_figure(fig, "fig", qu_id)
         # Fix axis names
         axs[0].set_xlabel("In-phase" + y_unit_str)
         axs[0].set_ylabel("Quadrature" + y_unit_str)
@@ -251,34 +227,42 @@ def rr_spec_analysis(
 
         # Try complex model fit
         try:
-            fit_res = analyze_rr_complex_data(
-                anal_res, qu_data, qu_info, measurement, axs, qu_id
+            sub_anal_res = analyze_rr_complex_data(
+                qu_data, qu_info, measurement, axs, qu_id
             )
+            anal_res.update(sub_anal_res)
+            fit_res = sub_anal_res.get_fit("Complex fit", qu_id)
         except Exception as e:
             print(f"Error fitting the complex resonator data:", e)
             print(f"Trying to fit just the magnitude")
             # Fallback to linmag squared fit
             try:
-                fit_res = analyze_rr_magnitude(anal_res, qu_data, qu_info, axs, qu_id)
+                sub_anal_res = analyze_rr_magnitude(qu_data, qu_info, axs, qu_id)
+                anal_res.update(sub_anal_res)
+                fit_res = sub_anal_res.get_fit("Magnitude squared fit", qu_id)
             except Exception as e2:
                 print(f"Error fitting the magnitude:", e2)
                 fit_res = None
     elif has_sweeps:
         fig, axs = plot_mag_phase(datadict=datadict)
-        anal_res.figures.update({f"{qu_id}_fig": fig})
+        anal_res.add_figure(fig, "fig", qu_id)
 
         sweep0_info = sweep_info[0]
         if sweep0_info.id == "readout_amplitude":
+            power_offset = qubit_params["readout_range_out"].value
+            add_power_axis(axs[0], power_offset)
             # Try to extract the optimal readout amplitude
             # If the optimal amplitude is found, run rr_spec_analysis on the chosen trace
-            analyze_rr_amplitude_sweep(
-                anal_res, qu_data, qu_info, datadict, qpu, axs, qu_id
+            sub_anal_res = analyze_rr_amplitude_sweep(
+                qu_data, qu_info, datadict, qpu, axs, qu_id
             )
+            anal_res.update(sub_anal_res)
             fit_res = None
 
     finalize_plot(
         fig,
         "Readout resonator spectroscopy",
+        qu_id,
         fit_res=fit_res,
         qubit_params=qubit_params,
         updated_params=anal_res.updated_params[qu_id],
@@ -292,13 +276,14 @@ def rr_spec_analysis(
     return anal_res
 
 
-# TODO: add power axis
-
-
-def analyze_rr_complex_data(anal_res, qu_data, qu_info, measurement, axs, qu_id):
+def analyze_rr_complex_data(
+    qu_data, qu_info, measurement, axs, qu_id
+) -> AnalysisResult:
     """Analyze the complex data to extract the resonance frequency and kappa_tot."""
-    x_data, y_data, _ = qu_data
-    x_info, y_info, _ = qu_info
+    anal_res = AnalysisResult()
+
+    x_data, y_data, *_ = qu_data
+    x_info, y_info, *_ = qu_info
 
     is_wide_range = x_data[-1] - x_data[0] > 200e6
     fit_acceptability = FitQuality.GOOD if is_wide_range else FitQuality.ACCEPTABLE
@@ -312,11 +297,11 @@ def analyze_rr_complex_data(anal_res, qu_data, qu_info, measurement, axs, qu_id)
         )
     # Extract parameters
     fr = fit_res.params_by_name["fr"]
-    anal_res.updated_params[qu_id]["readout_resonator_frequency"] = fr
-    anal_res.updated_params[qu_id]["readout_kappa_tot"] = (
-        fr / fit_res.params_by_name["Q_tot"]
+    kappa_tot = fr / fit_res.params_by_name["Q_tot"]
+    anal_res.add_params(
+        {"readout_resonator_frequency": fr, "readout_kappa_tot": kappa_tot}, qu_id
     )
-    anal_res.fits.update({"Complex fit": fit_res})
+    anal_res.add_fit(fit_res, "Complex fit", qu_id)
     # Plot
     x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))
     y_fit_scaled = fit_res.predict(x_fit) * y_info.scale
@@ -337,11 +322,13 @@ def analyze_rr_complex_data(anal_res, qu_data, qu_info, measurement, axs, qu_id)
         np.unwrap(np.angle(y_fit_scaled)) + phase_offset,
         color="tab:orange",
     )
-    return fit_res
+    return anal_res
 
 
-def analyze_rr_magnitude(anal_res, qu_data, qu_info, axs, qu_id):
+def analyze_rr_magnitude(qu_data, qu_info, axs, qu_id) -> AnalysisResult:
     """Analyze the squared magnitude to extract the resonance frequency."""
+    anal_res = AnalysisResult()
+
     x_data, y_data, _ = qu_data
     x_info, y_info, _ = qu_info
 
@@ -350,19 +337,20 @@ def analyze_rr_magnitude(anal_res, qu_data, qu_info, axs, qu_id):
         raise Exception(
             f"Fit not acceptable with {fit_res.model_name} model, nrmse = {fit_res.metrics['nrmse']:.4f}"
         )
-    anal_res.updated_params[qu_id]["readout_resonator_frequency"] = (
-        fit_res.params_by_name["x0"]
-    )
-    anal_res.fits.update({"Magnitude squared fit": fit_res})
+    fr = fit_res.params_by_name["x0"]
+    anal_res.add_params({"readout_resonator_frequency": fr}, qu_id)
+    anal_res.add_fit(fit_res, "Magnitude squared fit", qu_id)
     # Plot
     x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))
     y_fit = np.sqrt(fit_res.predict(x_fit)) * np.max(np.abs(y_data))
     axs[1].plot(x_fit * x_info.scale, y_fit * y_info.scale, color="tab:orange")
 
-    return fit_res
+    return anal_res
 
 
-def analyze_rr_amplitude_sweep(anal_res, qu_data, qu_info, datadict, qpu, axs, qu_id):
+def analyze_rr_amplitude_sweep(
+    qu_data, qu_info, datadict, qpu, axs, qu_id
+) -> AnalysisResult:
     """Tries to find the optimal amplitude for readout. If the optimal amplitude is found,
     also the single trace at the chosen amplitude in analyzed recursively.
 
@@ -371,6 +359,8 @@ def analyze_rr_amplitude_sweep(anal_res, qu_data, qu_info, datadict, qpu, axs, q
     and then increase again (the resonator enters the non-linear regime). This function uses the earlies
     (lowest amplitude) dip in NRMSE to estimate the optimal amplitude. However, if the fit is
     not great, the result is discarded."""
+    anal_res = AnalysisResult()
+
     x_data, y_data, sweeps = qu_data
     x_info, y_info, sweep_info = qu_info
     sweep0_info = sweep_info[0]
@@ -379,7 +369,7 @@ def analyze_rr_amplitude_sweep(anal_res, qu_data, qu_info, datadict, qpu, axs, q
     for i in range(len(sweeps[0])):
         fit_res = sqil.resonator.linmag_fit(x_data[i, :], y_data[i, :])
         nrmses[i] = fit_res.metrics["nrmse"]
-    anal_res.extra_data.update({"nrmses": nrmses})
+    anal_res.add_extra_data(nrmses, "nrmses", qu_id)
     best_idx = sqil.find_first_minima_idx(nrmses)
 
     is_fit_okay = False
@@ -420,32 +410,37 @@ def analyze_rr_amplitude_sweep(anal_res, qu_data, qu_info, datadict, qpu, axs, q
         axs[0].axhline(sweeps[0][best_idx], color="tab:red", linestyle="--")
     ax.legend()
     fig2.tight_layout()
-    anal_res.figures.update({f"{qu_id}_fig_best_amp": fig2})
+    anal_res.add_figure(fig2, "fig_best_amp", qu_id)
 
     # Recursive step to update readout frequency and kappa_tot
     if is_fit_okay:
         best_amp = sweeps[0][best_idx]
-        anal_res.updated_params[qu_id].update({sweep0_info.id: best_amp})
+        anal_res.add_params({sweep0_info.id: best_amp}, qu_id)
         try:
             anal_res_no_sweep = rr_spec_analysis(
-                datadict=datadict, qpu=qpu, at_sweep_idx=best_idx
+                datadict=datadict, qpu=qpu, at_sweep_idx=best_idx, qu_id=qu_id
             )
-            anal_res.fits.update(anal_res_no_sweep.fits)
-            for qu_id in anal_res.updated_params.keys():
-                anal_res.updated_params[qu_id].update(
-                    anal_res_no_sweep.updated_params[qu_id]
-                )
-            fig_single = anal_res_no_sweep.figures["fig"]
+            # Rename fig to fig_single
+            fig_single = anal_res_no_sweep.figures.pop(f"{qu_id}_fig")
+            anal_res_no_sweep.add_figure(fig_single, "fig_single", qu_id)
+            # Update analysis result
+            anal_res.update(anal_res_no_sweep)
+
             fig_single.suptitle(
                 fig_single.get_suptitle().replace(
                     "resonator spectroscopy", "trace at chosen operating point"
                 )
             )
-            anal_res.figures.update({f"{qu_id}_fig_single": fig_single})
         except Exception as e:
-            anal_res.updated_params[qu_id].update(
+            fit_res = sqil.resonator.linmag_fit(
+                x_data[best_idx, :], y_data[best_idx, :]
+            )
+            anal_res.add_params(
                 {
                     "readout_resonator_frequency": fit_res.params_by_name["x0"],
-                }
+                },
+                qu_id,
             )
             print("Error while analyzing the selected single trace", e)
+
+    return anal_res
