@@ -116,14 +116,13 @@ class RRSpec(ExperimentHandler):
         *params,
         **kwargs,
     ):
-        if type(qu_ids) in [str, int]:
-            qu_ids = [qu_ids]
         if len(qu_ids) > 1:
             raise ValueError("Only one qubit at the time is allowed")
+        qubit = self.qpu[qu_ids[0]]
         return create_experiment(
             self.qpu,
-            self.qpu[qu_ids[0]],
-            readout_resonator_frequency,
+            qubit,
+            readout_resonator_frequency[0],
             options=options,
         )
 
@@ -182,7 +181,6 @@ def rr_spec_analysis(
 ) -> AnalysisResult:
     # Prepare analysis result object
     anal_res: AnalysisResult = AnalysisResult()
-    anal_res.updated_params[qu_id] = {}
 
     # Extract data and metadata
     qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
@@ -265,7 +263,7 @@ def rr_spec_analysis(
         qu_id,
         fit_res=fit_res,
         qubit_params=qubit_params,
-        updated_params=anal_res.updated_params[qu_id],
+        updated_params=anal_res.updated_params.get(qu_id, {}),
         sweep_info=sweep_info,
         relevant_params=relevant_params,
     )

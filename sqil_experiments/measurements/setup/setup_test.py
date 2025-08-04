@@ -17,13 +17,13 @@ from sqil_core.experiment import bind_instrument_qubit
 # Checklist for every cooldown
 # - update data_folder_name
 # - update the initial_readout_lo_freq, an approximate value is required to run onetone
-data_folder_name = "test"
+data_folder_name = "20250804_20250513_N31"
 initial_readout_lo_freq = 7.2e9
 
 
 # Data storage
 db_root = r"Z:\Projects\BottomLoader\data"
-db_root_local = r"C:\Users\sqil\Desktop\code\sqil-experiments\data_local"
+db_root_local = r"C:\Users\sqil\Desktop\data_local"
 storage = {
     "db_type": "plottr",
     "db_path": os.path.join(db_root, data_folder_name),
@@ -35,16 +35,16 @@ storage = {
 # Zurich instruments setup from descriptor
 # Requires laboneq < 2.51 - generate_descriptor doesn't support
 # passing instrument options, like "SHFQC/QC4CH" which are now mandatory
-zi_descriptor = generate_descriptor(
-    shfqc_6=["dev12183"],
-    number_data_qubits=1,
-    number_flux_lines=0,
-    include_cr_lines=False,
-    multiplex=False,
-    number_multiplex=0,
-    get_zsync=False,
-    ip_address="localhost",
-)
+# zi_descriptor = generate_descriptor(
+#     shfqc_6=["dev12183"],
+#     number_data_qubits=1,
+#     number_flux_lines=0,
+#     include_cr_lines=False,
+#     multiplex=False,
+#     number_multiplex=0,
+#     get_zsync=False,
+#     ip_address="localhost",
+# )
 # zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
 
 

@@ -76,9 +76,6 @@ def create_experiment(
                 qop.passive_reset(qubit)
 
 
-from sqil_core.experiment import AnalysisResult
-
-
 class TimeRabi(ExperimentHandler):
     exp_name = "time_rabi"
     db_schema = {
@@ -89,72 +86,56 @@ class TimeRabi(ExperimentHandler):
     def sequence(
         self,
         pulse_lengths,
-        qu_idx=0,
+        qu_ids=["q0"],
         options: TimeRabiOptions | None = None,
         *params,
         **kwargs,
     ):
-        return create_experiment(
-            self.qpu,
-            self.qpu.qubits[qu_idx],
-            pulse_lengths,
-            options=options,
-        )
+        qubits = [self.qpu[qu_id] for qu_id in qu_ids]
+        return create_experiment(self.qpu, qubits[0], pulse_lengths[0], options=options)
 
-    def analyze(
-        self, path, qu_uid="q0", transition="ge", relevant_params=None, **kwargs
-    ):
+    def analyze(self, path, *args, **kwargs):
         # FIXME: passing qu_uid = qu_uid causes an error, unhashable type: 'numpy.ndarray'
-        return analyze_time_rabi(
-            path=path,
-            qu_uid="q0",
-            transition=transition,
-            relevant_params=relevant_params,
-            **kwargs,
-        )
+        return analyze_time_rabi(path=path, **kwargs)
 
 
+from sqil_core.experiment import AnalysisResult, multi_qubit_handler
 from sqil_core.utils import *
 
 
+@multi_qubit_handler
 def analyze_time_rabi(
-    path=None,
-    datadict=None,
+    datadict,
     qpu=None,
-    qu_uid="q0",
+    qu_id="q0",
     transition="ge",
     relevant_params=None,
     **kwargs,
 ):
-    # Extract data and metadata
-    all_data, all_info, datadict = get_data_and_info(path=path, datadict=datadict)
-    lengths, y_data, sweeps = all_data
-    x_info, y_info, sweep_info = all_info
+    # Prepare analysis result object
+    anal_res = AnalysisResult()
 
-    # Extract qubit parameters
-    if qpu is None and path is not None:
-        qpu = read_qpu(path, "qpu_old.json")
-    qubit_params = {}
-    if qpu is not None:
-        qubit_params = enrich_qubit_params(qpu.quantum_element_by_uid(qu_uid))
+    # Extract data and metadata
+    qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
+    lengths, y_data, sweeps = qu_data
+    x_info, y_info, sweep_info = qu_info
+
+    fit_res = None
+    qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:
         relevant_params = [f"{transition}_drive_amplitude_pi"]
 
-    anal_res = AnalysisResult()
-    anal_res.updated_params[qu_uid] = {}
-    fit_res = None
-
+    # Set plot style
     sqil.set_plot_style(plt)
 
     has_sweeps = y_data.ndim > 1
-
     if not has_sweeps:
         try:
             # Project the data and start plot
             proj, inv = sqil.fit.transform_data(y_data, inv_transform=True)
             fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj)
-            anal_res.figures.update({"fig": fig})
+            anal_res.add_figure(fig, "fig", qu_id)
             # Analyze
             fit_res_exp = sqil.fit.fit_decaying_oscillations(lengths, proj)
             fit_res_const = sqil.fit.fit_oscillations(lengths, proj)
@@ -162,11 +143,11 @@ def analyze_time_rabi(
                 fit_res_exp, fit_res_const, recipe="nrmse_aic"
             )
 
-            anal_res.fits.update({"Decaying oscillations": fit_res_exp})
-            anal_res.fits.update({"Constant oscillations": fit_res_const})
+            anal_res.add_fit(fit_res_exp, "Decaying oscillations", qu_id)
+            anal_res.add_fit(fit_res_const, "Constant oscillations", qu_id)
             # Update parameters
-            anal_res.updated_params[qu_uid].update(
-                {f"{transition}_drive_length": fit_res.metadata["pi_time"]}
+            anal_res.add_params(
+                {f"{transition}_drive_length": fit_res.metadata["pi_time"]}, qu_id
             )
 
             x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
@@ -194,9 +175,10 @@ def analyze_time_rabi(
     finalize_plot(
         fig,
         f"Time Rabi ({transition})",
+        qu_id,
         fit_res,
         qubit_params,
-        anal_res.updated_params[qu_uid],
+        anal_res.updated_params.get(qu_id, {}),
         sweep_info=sweep_info,
         relevant_params=relevant_params,
     )

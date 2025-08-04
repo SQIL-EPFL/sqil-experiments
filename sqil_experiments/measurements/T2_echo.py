@@ -15,7 +15,7 @@ from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import TuneupExperimentOptions
 from matplotlib.gridspec import GridSpec
 from numpy.typing import ArrayLike
-from sqil_core.experiment import AnalysisResult, ExperimentHandler
+from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
 
 if TYPE_CHECKING:
@@ -175,71 +175,48 @@ class T2Echo(ExperimentHandler):
         "time": {"role": "x-axis", "unit": "s", "scale": 1e6},
     }
 
-    def sequence(self, time, qu_idx=0, options=None, *args, **kwargs):
-        return create_experiment(
-            self.qpu, self.qpu.quantum_elements[qu_idx], time, options=options
-        )
+    def sequence(self, time, qu_ids=["q0"], options=None, *args, **kwargs):
+        qubits = [self.qpu[qu_id] for qu_id in qu_ids]
+        return create_experiment(self.qpu, qubits, time, options=options)
 
-    def analyze(
-        self,
-        path,
-        datadict=None,
-        qpu=None,
-        qu_uid="q0",
-        transition="ge",
-        relevant_params=None,
-        **kwargs,
-    ):
-        return analyze_T2_echo(
-            path=path,
-            datadict=datadict,
-            qpu=qpu,
-            qu_uid=qu_uid,
-            transition=transition,
-            relevant_params=relevant_params,
-        )
+    def analyze(self, path, *args, **kwargs):
+        return analyze_T2_echo(path=path, **kwargs)
 
 
+@multi_qubit_handler
 def analyze_T2_echo(
-    path=None,
-    datadict=None,
-    qpu=None,
-    transition="ge",
-    qu_uid="q0",
-    relevant_params=None,
+    datadict, qpu=None, qu_id="q0", transition="ge", relevant_params=None, **kwargs
 ):
-    # Extract data and metadata
-    all_data, all_info, datadict = get_data_and_info(path=path, datadict=datadict)
-    x_data, y_data, sweeps = all_data
-    x_info, y_info, sweep_info = all_info
+    # Prepare analysis result object
+    anal_res = AnalysisResult()
 
-    # Extract qubit parameters
-    if qpu is None and path is not None:
-        qpu = read_qpu(path, "qpu_old.json")
-    qubit_params = {}
-    if qpu is not None:
-        qubit_params = enrich_qubit_params(qpu.quantum_element_by_uid(qu_uid))
+    # Extract data and metadata
+    qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
+    x_data, y_data, sweeps = qu_data
+    x_info, y_info, sweep_info = qu_info
+
+    fit_res = None
+    qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:
         relevant_params = [f"{transition}_drive_amplitude_pi"]
 
-    # Define analysis result
-    anal_res = AnalysisResult()
-    anal_res.updated_params[qu_uid] = {}
-    fit_res = None
+    # Set plot style
+    sqil.set_plot_style(plt)
 
     # Plot raw data and extract projection
     fig, axs, proj, inv = sqil.plot_projection_IQ(datadict=datadict, full_output=True)
-    anal_res.figures.update({"fig": fig})
+    anal_res.add_figure(fig, "fig", qu_id)
 
     # Fit exponential
     fit_res = sqil.fit.fit_decaying_exp(x_data, proj)
     x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
     inverse_fit = inv(fit_res.predict(x_fit))
+    anal_res.add_fit(fit_res, "fit", qu_id)
 
     # Update parameters
     T2 = fit_res.params_by_name["tau"]
-    anal_res.updated_params[qu_uid].update({f"{transition}_T2": T2})
+    anal_res.add_params({f"{transition}_T2": T2}, qu_id)
 
     # Plot the fit
     axs[0].plot(x_fit * x_info.scale, fit_res.predict(x_fit) * y_info.scale, "tab:red")
@@ -252,9 +229,10 @@ def analyze_T2_echo(
     finalize_plot(
         fig,
         f"T2 echo ({transition})",
+        qu_id,
         fit_res,
         qubit_params,
-        updated_params=anal_res.updated_params[qu_uid],
+        updated_params=anal_res.updated_params.get(qu_id, {}),
         sweep_info=sweep_info,
         relevant_params=relevant_params,
     )
