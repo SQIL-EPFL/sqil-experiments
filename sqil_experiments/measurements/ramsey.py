@@ -16,7 +16,7 @@ from laboneq_applications.experiments.options import (
     BaseExperimentOptions,
     TuneupExperimentOptions,
 )
-from sqil_core.experiment import AnalysisResult, ExperimentHandler
+from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
 
 if TYPE_CHECKING:
@@ -192,63 +192,38 @@ class Ramsey(ExperimentHandler):
         "time": {"role": "x-axis", "unit": "s", "scale": 1e6},
     }
 
-    def sequence(self, time, detuning, qu_idx=0, options=None, *args, **kwargs):
-        return create_experiment(
-            self.qpu, self.qpu.quantum_elements[qu_idx], time, detuning, options=options
-        )
+    def sequence(self, time, detuning, qu_ids=["q0"], options=None, *args, **kwargs):
+        qubits = [self.qpu[qu_id] for qu_id in qu_ids]
+        return create_experiment(self.qpu, qubits, time, detuning, options=options)
 
-    def analyze(
-        self,
-        path,
-        *args,
-        datadict=None,
-        qpu=None,
-        qu_uid="q0",
-        transition="ge",
-        relevant_params=None,
-        **kwargs,
-    ):
-        return analyze_ramsey(
-            path=path,
-            datadict=datadict,
-            qpu=qpu,
-            qu_uid=qu_uid,
-            transition=transition,
-            relevant_params=relevant_params,
-        )
+    def analyze(self, path, *args, **kwargs):
+        return analyze_ramsey(path=path, **kwargs)
 
 
+@multi_qubit_handler
 def analyze_ramsey(
-    path=None,
-    datadict=None,
-    qpu=None,
-    transition="ge",
-    qu_uid="q0",
-    relevant_params=None,
+    datadict, qpu=None, qu_id="q0", transition="ge", relevant_params=None, **kwargs
 ):
-    # Extract data and metadata
-    all_data, all_info, datadict = get_data_and_info(path=path, datadict=datadict)
-    x_data, y_data, sweeps = all_data
-    x_info, y_info, sweep_info = all_info
+    # Prepare analysis result object
+    anal_res = AnalysisResult()
 
-    # Extract qubit parameters
-    if qpu is None and path is not None:
-        qpu = read_qpu(path, "qpu_old.json")
-    qubit_params = {}
-    if qpu is not None:
-        qubit_params = enrich_qubit_params(qpu.quantum_element_by_uid(qu_uid))
+    # Extract data and metadata
+    qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
+    x_data, y_data, sweeps = qu_data
+    x_info, y_info, sweep_info = qu_info
+
+    fit_res = None
+    qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:
         relevant_params = [f"{transition}_drive_amplitude_pi"]
 
-    # Define analysis result
-    anal_res = AnalysisResult()
-    anal_res.updated_params[qu_uid] = {}
-    fit_res = None
+    # Set plot style
+    sqil.set_plot_style(plt)
 
     # Plot raw data and extract projection
     fig, axs, proj, inv = sqil.plot_projection_IQ(datadict=datadict, full_output=True)
-    anal_res.figures.update({"fig": fig})
+    anal_res.add_figure(fig, "fig", qu_id)
 
     # Try to fit the sum of 1, 2 and 3 decaying oscillations and see which one fits best
     best_fit = None
@@ -259,6 +234,7 @@ def analyze_ramsey(
         except:
             fit_res = None
         if fit_res is not None:
+            anal_res.add_fit(fit_res, f"{n} oscillations", qu_id)
             if best_fit is None:
                 best_fit = fit_res
                 continue
@@ -267,11 +243,11 @@ def analyze_ramsey(
     if best_fit is not None:
         # Update parameters
         taus = [
-            fit_res.params_by_name.get(f"tau{n}", np.inf)
+            best_fit.params_by_name.get(f"tau{n}", np.inf)
             for n in range(len(n_oscillation))
         ]
         T2_star = np.min(taus)
-        anal_res.updated_params[qu_uid].update({f"{transition}_T2_star": T2_star})
+        anal_res.add_params({f"{transition}_T2_star": T2_star}, qu_id)
 
         x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
         inverse_fit = inv(best_fit.predict(x_fit))
@@ -306,14 +282,15 @@ def analyze_ramsey(
     ax2.set_title("Fourier transform")
     ax2.legend()
     fig2.tight_layout()
-    anal_res.figures.update({"fft": fig2})
+    anal_res.add_figure(fig2, "fft", qu_id)
 
     finalize_plot(
         fig,
         f"Ramsey ({transition})",
+        qu_id,
         fit_res,
         qubit_params,
-        updated_params=anal_res.updated_params[qu_uid],
+        updated_params=anal_res.updated_params.get(qu_id, {}),
         sweep_info=sweep_info,
         relevant_params=relevant_params,
     )
