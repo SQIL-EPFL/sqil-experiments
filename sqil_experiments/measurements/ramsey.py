@@ -288,7 +288,7 @@ def analyze_ramsey(
         fig,
         f"Ramsey ({transition})",
         qu_id,
-        fit_res,
+        best_fit,
         qubit_params,
         updated_params=anal_res.updated_params.get(qu_id, {}),
         sweep_info=sweep_info,
