@@ -17,13 +17,13 @@ from sqil_core.experiment import bind_instrument_qubit
 # Checklist for every cooldown
 # - update data_folder_name
 # - update the initial_readout_lo_freq, an approximate value is required to run onetone
-data_folder_name = "test"
+data_folder_name = "20250806_20250513_N31_gevarnish"
 initial_readout_lo_freq = 7.2e9
 
 
 # Data storage
 db_root = r"Z:\Projects\BottomLoader\data"
-db_root_local = r"C:\Users\sqil\Desktop\code\sqil-experiments\data_local"
+db_root_local = r"C:\Users\sqil\Desktop\data_local"
 storage = {
     "db_type": "plottr",
     "db_path": os.path.join(db_root, data_folder_name),
@@ -32,26 +32,10 @@ storage = {
 }
 
 
-# Zurich instruments setup from descriptor
-# Requires laboneq < 2.51 - generate_descriptor doesn't support
-# passing instrument options, like "SHFQC/QC4CH" which are now mandatory
-# zi_descriptor = generate_descriptor(
-#     shfqc_6=["dev12183"],
-#     number_data_qubits=1,
-#     number_flux_lines=0,
-#     include_cr_lines=False,
-#     multiplex=False,
-#     number_multiplex=0,
-#     get_zsync=False,
-#     ip_address="localhost",
-# )
-# zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
-
-
 # Zurich Instruments setup
 def generate_zi_setup():
     return generate_device_setup(
-        number_qubits=2,
+        number_qubits=1,
         shfqc=[
             {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
         ],
@@ -61,7 +45,6 @@ def generate_zi_setup():
     )
 
 
-# zi_setup = DeviceSetup.from_descriptor(zi_descriptor, "localhost")
 def generate_qpu(zi_setup):
     qubits = SqilTransmon.from_device_setup(zi_setup)
     quantum_operations = SqilTransmonOperations()
@@ -119,11 +102,3 @@ instruments = {
     #     },
     # },
 }
-
-# Initialize QPU
-# qubits = TunableTransmonQubit.from_device_setup(zi_setup)
-# quantum_operations = TunableTransmonOperations()
-# qpu = QPU(qubits=qubits, quantum_operations=quantum_operations)
-
-# # Save QPU to file
-# serializers.save(qpu, "qpu_test.json")
