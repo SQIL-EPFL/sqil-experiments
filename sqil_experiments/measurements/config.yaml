@@ -1,2 +1,3 @@
-setup_path: "./setup/setup_test.py"
+# setup_path: "./setup/setup_test.py"
+setup_path: "./setup/setup_transmon.py"
 # setup_path: "./setup/setup_emulation.py"
