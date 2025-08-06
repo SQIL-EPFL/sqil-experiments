@@ -191,7 +191,7 @@ def analyze_T1(
     x_data, y_data, sweeps = qu_data
     x_info, y_info, sweep_info = qu_info
 
-    fit_res = None
+    fit_res, fig = None, None
     qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:

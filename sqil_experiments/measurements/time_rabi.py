@@ -103,6 +103,7 @@ from sqil_core.experiment import AnalysisResult, multi_qubit_handler
 from sqil_core.utils import *
 
 
+# TODO: ADD OPTION TO CALIBRATE ALSO FUCKING PI/2 PULSE
 @multi_qubit_handler
 def analyze_time_rabi(
     datadict,
@@ -120,7 +121,7 @@ def analyze_time_rabi(
     lengths, y_data, sweeps = qu_data
     x_info, y_info, sweep_info = qu_info
 
-    fit_res = None
+    fit_res, fig = None, None
     qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:

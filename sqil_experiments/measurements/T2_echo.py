@@ -195,7 +195,7 @@ def analyze_T2_echo(
     x_data, y_data, sweeps = qu_data
     x_info, y_info, sweep_info = qu_info
 
-    fit_res = None
+    fit_res, fig = None, None
     qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:
@@ -204,27 +204,60 @@ def analyze_T2_echo(
     # Set plot style
     sqil.set_plot_style(plt)
 
-    # Plot raw data and extract projection
-    fig, axs, proj, inv = sqil.plot_projection_IQ(datadict=datadict, full_output=True)
-    anal_res.add_figure(fig, "fig", qu_id)
+    has_sweeps = y_data.ndim > 1
+    if not has_sweeps:
+        # Plot raw data and extract projection
+        fig, axs, proj, inv = sqil.plot_projection_IQ(
+            datadict=datadict, full_output=True
+        )
+        anal_res.add_figure(fig, "fig", qu_id)
 
-    # Fit exponential
-    fit_res = sqil.fit.fit_decaying_exp(x_data, proj)
-    x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
-    inverse_fit = inv(fit_res.predict(x_fit))
-    anal_res.add_fit(fit_res, "fit", qu_id)
+        # Fit exponential
+        fit_res = sqil.fit.fit_decaying_exp(x_data, proj)
+        x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
+        inverse_fit = inv(fit_res.predict(x_fit))
+        anal_res.add_fit(fit_res, "fit", qu_id)
 
-    # Update parameters
-    T2 = fit_res.params_by_name["tau"]
-    anal_res.add_params({f"{transition}_T2": T2}, qu_id)
+        # Update parameters
+        T2 = fit_res.params_by_name["tau"]
+        anal_res.add_params({f"{transition}_T2": T2}, qu_id)
 
-    # Plot the fit
-    axs[0].plot(x_fit * x_info.scale, fit_res.predict(x_fit) * y_info.scale, "tab:red")
-    axs[1].plot(
-        inverse_fit.real * y_info.scale,
-        inverse_fit.imag * y_info.scale,
-        "tab:red",
-    )
+        # Plot the fit
+        axs[0].plot(
+            x_fit * x_info.scale, fit_res.predict(x_fit) * y_info.scale, "tab:red"
+        )
+        axs[1].plot(
+            inverse_fit.real * y_info.scale,
+            inverse_fit.imag * y_info.scale,
+            "tab:red",
+        )
+    elif y_data.ndim == 2:
+        T2s = np.zeros(len(y_data))
+        for i in range(len(y_data)):
+            fit_res = None
+            x, y = x_data[i], y_data[i]
+            try:
+                proj = sqil.fit.transform_data(y, inv_transform=False)
+                fit_res = sqil.fit.fit_decaying_exp(x, proj)
+            except Exception as e:
+                print(f"Error ananlyzing trace {i}", e)
+            if fit_res is not None:
+                anal_res.add_fit(fit_res, f"fit idx {i}", qu_id)
+                T2s[i] = fit_res.params_by_name["tau"]
+
+        # Update params
+        T2 = np.mean(T2s)
+        anal_res.add_params({f"{transition}_T2": T2}, qu_id)
+
+        # Plot
+        T2_info = ParamInfo(f"{transition}_T2")
+        T2_scaled = T2s * T2_info.scale
+        sweep_scaled = sweeps[0] * sweep_info[0].scale
+        fig, axs = plt.subplots(1, 1)
+        axs.plot(sweep_scaled, T2_scaled, ".-")
+        axs.axhline(y=T2 * T2_info.scale, color="tab:pink", linestyle="--")
+        axs.set_ylabel(T2_info.name_and_unit)
+        axs.set_xlabel(sweep_info[0].name_and_unit)
 
     finalize_plot(
         fig,
