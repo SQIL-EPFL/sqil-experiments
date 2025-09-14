@@ -32,7 +32,6 @@ class TimeRabiOptions:
         description="Averaging mode.",
         converter=AveragingMode,
     )
-    transition: str = option_field("ge", description="Transition, ge or ef")
 
 
 @dsl.qubit_experiment
@@ -41,8 +40,11 @@ def create_experiment(
     qubit: QuantumElement,
     pulse_lengths: ArrayLike,
     options: TimeRabiOptions | None = None,
+    transition="ge",
 ) -> Experiment:
     opts = TimeRabiOptions() if options is None else options
+    opts.transition = transition
+
     qubit, pulse_lengths = validation.validate_and_convert_single_qubit_sweeps(
         qubit, pulse_lengths
     )
@@ -64,12 +66,11 @@ def create_experiment(
     ):
         with dsl.sweep(name="time_rabi_sweep", parameter=sweep_param) as pulse_len:
             with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
-                qop.prepare_state.omit_section(qubit, state=opts.transition[0])
+                qop.prepare_state(qubit, state=opts.transition[0])
                 qop.x180(
                     q=qubit,
-                    length=pulse_len + 20e-9,
-                    pulse={"can_compress": True, "width": pulse_len},
-                    transition="ge",
+                    length=pulse_len,
+                    transition=transition,
                 )
             with dsl.section(name="measure", alignment=SectionAlignment.LEFT):
                 qop.measure(qubit, dsl.handles.result_handle(qubit.uid))
@@ -87,12 +88,19 @@ class TimeRabi(ExperimentHandler):
         self,
         pulse_lengths,
         qu_ids=["q0"],
+        transition="ge",
         options: TimeRabiOptions | None = None,
         *params,
         **kwargs,
     ):
         qubits = [self.qpu[qu_id] for qu_id in qu_ids]
-        return create_experiment(self.qpu, qubits[0], pulse_lengths[0], options=options)
+        return create_experiment(
+            self.qpu,
+            qubits[0],
+            pulse_lengths[0],
+            transition=transition,
+            options=options,
+        )
 
     def analyze(self, path, *args, **kwargs):
         # FIXME: passing qu_uid = qu_uid causes an error, unhashable type: 'numpy.ndarray'
