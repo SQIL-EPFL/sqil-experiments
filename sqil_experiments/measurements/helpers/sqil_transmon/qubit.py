@@ -11,6 +11,9 @@ from laboneq.dsl.enums import ModulationType
 from laboneq.dsl.quantum import QuantumElement, QuantumParameters
 from laboneq.simple import dsl
 
+# Make sure to load custom pulses
+from .pulses import *
+
 if TYPE_CHECKING:
     from laboneq.dsl.experiment.pulse import Pulse
 
@@ -347,7 +350,7 @@ class SqilTransmon(QuantumElement):
         }
         return "acquire", params
 
-    def spectroscopy_parameters(self) -> tuple[str, dict]:
+    def spectroscopy_parameters(self, transition) -> tuple[str, dict]:
         """Return the qubit-spectroscopy line and the spectroscopy-pulse parameters.
 
         Returns:
@@ -356,9 +359,21 @@ class SqilTransmon(QuantumElement):
            params:
                The spectroscopy-pulse parameters.
         """
+        line = "drive"
+        if transition == "ge":
+            pass
+        elif transition == "ef":
+            line += "_ef"
+        else:
+            raise (
+                f"Spectroscopy not defined for transition {transition}."
+                "Update the quantum operations of your qubit with the desired channel."
+            )
+
         param_keys = ["amplitude", "length", "pulse"]
         params = {k: getattr(self.parameters, f"spectroscopy_{k}") for k in param_keys}
-        return "drive", params
+
+        return line, params
 
     def default_integration_kernels(self) -> list[Pulse]:
         """Return a default list of integration kernels.
