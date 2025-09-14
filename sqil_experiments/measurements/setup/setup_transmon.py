@@ -18,6 +18,7 @@ from sqil_core.experiment import bind_instrument_qubit
 # - update data_folder_name
 # - update the initial_readout_lo_freq, an approximate value is required to run onetone
 data_folder_name = "20250910_20250324_N44_in"
+data_folder_name = "20250910_20250324_N44_in"
 initial_readout_lo_freq = 7.2e9
 
 
