@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from laboneq.dsl.calibration import Oscillator
 from laboneq.dsl.enums import ModulationType
+from laboneq.dsl.parameter import SweepParameter
 from laboneq.simple import SectionAlignment, dsl
 
 from .qubit import SqilTransmon
@@ -13,7 +14,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from laboneq.dsl.calibration import Calibration
-    from laboneq.dsl.parameter import SweepParameter
     from laboneq_applications.typing import QuantumElements
 
 # TODO: Implement multistate 0-1-2 measurement operation
@@ -814,6 +814,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         phase: float = 0.0,
         length: float | SweepParameter | None = None,
         pulse: dict | None = None,
+        transition: str = "ge",
     ) -> None:
         """Long pulse used for qubit spectroscopy that emulates a coherent field.
 
@@ -840,8 +841,10 @@ class SqilTransmonOperations(dsl.QuantumOperations):
                 completely replaces the existing pulse parameters.
 
                 Otherwise, the values override or extend the existing ones.
+            transition:
+                'ge' or 'ef'.
         """
-        spec_line, params = q.spectroscopy_parameters()
+        spec_line, params = q.spectroscopy_parameters(transition)
         if amplitude is None:
             amplitude = params["amplitude"]
         if length is None:
