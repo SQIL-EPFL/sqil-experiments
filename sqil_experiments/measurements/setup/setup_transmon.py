@@ -17,7 +17,7 @@ from sqil_core.experiment import bind_instrument_qubit
 # Checklist for every cooldown
 # - update data_folder_name
 # - update the initial_readout_lo_freq, an approximate value is required to run onetone
-data_folder_name = "20250806_20250513_N31_gevarnish"
+data_folder_name = "20250910_20250324_N44_in"
 initial_readout_lo_freq = 7.2e9
 
 
@@ -37,7 +37,12 @@ def generate_zi_setup():
     return generate_device_setup(
         number_qubits=1,
         shfqc=[
-            {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
+            # {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
+            {
+                "serial": "dev12537",
+                "number_of_channels": 4,
+                "options": "SHFQC/PLUS/QC2CH",
+            }
         ],
         include_flux_lines=False,
         multiplex_drive_lines=True,
