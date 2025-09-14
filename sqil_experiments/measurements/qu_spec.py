@@ -20,7 +20,7 @@ import sqil_core as sqil
 from laboneq import workflow
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
 from laboneq.dsl.quantum.qpu import QPU
-from laboneq.simple import Experiment, SweepParameter, dsl
+from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
 from laboneq.workflow import option_field, task_options
 from laboneq_applications.core.validation import validate_and_convert_qubits_sweeps
 from laboneq_applications.experiments.options import BaseExperimentOptions
@@ -50,6 +50,7 @@ def create_experiment(
     qpu: QPU,
     qubits: QuantumElements,
     frequencies: QubitSweepPoints,
+    transition: str = "ge",
     options: QuSpecOptions | None = None,
 ) -> Experiment:
     # Define the custom options for the experiment
@@ -72,14 +73,16 @@ def create_experiment(
                 name=f"freqs_{q.uid}",
                 parameter=SweepParameter(f"frequency_{q.uid}", q_frequencies),
             ) as frequency:
-                qop.set_frequency(q, frequency)
-                qop.qubit_spectroscopy_drive(q)
-                sec = qop.measure(q, dsl.handles.result_handle(q.uid))
-                # we fix the length of the measure section to the longest section among
-                # the qubits to allow the qubits to have different readout and/or
-                # integration lengths.
-                sec.length = max_measure_section_length
-                qop.passive_reset(q, delay=opts.spectroscopy_reset_delay)
+                with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
+                    qop.prepare_state(q, state=transition[0])
+                    qop.set_frequency(q, frequency)
+                    qop.qubit_spectroscopy_drive(q, transition=transition)
+                    sec = qop.measure(q, dsl.handles.result_handle(q.uid))
+                    # we fix the length of the measure section to the longest section among
+                    # the qubits to allow the qubits to have different readout and/or
+                    # integration lengths.
+                    sec.length = max_measure_section_length
+                    qop.passive_reset(q, delay=opts.spectroscopy_reset_delay)
 
 
 class QuSpec(ExperimentHandler):
@@ -102,7 +105,9 @@ class QuSpec(ExperimentHandler):
         qubits = [self.qpu[qu_id] for qu_id in qu_ids]
         if np.array(frequencies).ndim == 1:
             frequencies = [frequencies]
-        return create_experiment(self.qpu, qubits, frequencies, options=options)
+        return create_experiment(
+            self.qpu, qubits, frequencies, options=options, transition=transition
+        )
 
     def analyze(self, path, *args, **kwargs):
         return qu_spec_analysis(path=path, **kwargs)
