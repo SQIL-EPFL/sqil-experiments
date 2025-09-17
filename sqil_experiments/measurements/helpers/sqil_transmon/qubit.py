@@ -141,20 +141,16 @@ class SqilTransmonParameters(QuantumParameters):
     ge_drive_amplitude_pi2: float = 0.4
     ge_drive_length: float = 50e-9
     ge_drive_pulse: dict = attrs.field(
-        factory=lambda: {"function": "gaussian_square", "can_compress": True},
+        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
     )
 
     # e-f drive pulse parameters
 
-    ef_drive_amplitude_pi: float = 0.2
-    ef_drive_amplitude_pi2: float = 0.1
+    ef_drive_amplitude_pi: float = 0.8
+    ef_drive_amplitude_pi2: float = 0.4
     ef_drive_length: float = 50e-9
     ef_drive_pulse: dict = attrs.field(
-        factory=lambda: {
-            "function": "drag",
-            "beta": 0,
-            "sigma": 0.25,
-        },
+        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
     )
 
     # qubit-resonator coupling parameters

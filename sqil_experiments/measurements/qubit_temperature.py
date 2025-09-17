@@ -60,24 +60,28 @@ def create_experiment(
             name=f"amp_{qubit.uid}",
             parameter=SweepParameter(f"amplitude_{qubit.uid}", amplitudes),
         ) as amplitude:
-            qop.prepare_state(qubit, state=opts.transition[0])
-            qop.x180(qubit, amplitude=amplitude, transition=opts.transition)
-            qop.measure(qubit, dsl.handles.result_handle(qubit.uid))
+            qop.x180(qubit, amplitude=amplitude, transition="ef")
+            qop.measure(qubit, dsl.handles.result_handle(f"{qubit.uid}/data_no_pi"))
+            qop.passive_reset(qubit)
+
+            qop.prepare_state(qubit, state="e")
+            qop.x180(qubit, amplitude=amplitude, transition="ef")
+            qop.measure(qubit, dsl.handles.result_handle(f"{qubit.uid}/data_pi"))
             qop.passive_reset(qubit)
 
 
 class QubitTemperature(ExperimentHandler):
     exp_name = "qubit_temperature"
     db_schema = {
-        "data": {"role": "data", "unit": "V", "scale": 1e3},
-        "pulse_lengths": {"role": "x-axis", "unit": "s", "scale": 1e9},
+        "data_no_pi": {"role": "data", "unit": "V", "scale": 1e3},
+        "data_pi": {"role": "data", "unit": "V", "scale": 1e3},
+        "amplitude": {"role": "x-axis", "unit": "", "scale": 1e3},
     }
 
     def sequence(
         self,
-        pulse_lengths,
+        amplitude,
         qu_ids=["q0"],
-        transition="ge",
         options: QubitTemperatureOptions | None = None,
         *params,
         **kwargs,
@@ -86,8 +90,7 @@ class QubitTemperature(ExperimentHandler):
         return create_experiment(
             self.qpu,
             qubits[0],
-            pulse_lengths[0],
-            transition=transition,
+            amplitude[0],
             options=options,
         )
 
@@ -116,11 +119,19 @@ def analyze_qubit_temperature(
     lengths, y_data, sweeps = qu_data
     x_info, y_info, sweep_info = qu_info
 
+    # A_no_ge = np.mean(proj_no_pi)
+
+    h = 6.6e-34
+    kb = 1.38e-23
+    qu_freq = 5.35e9
+
     fit_res, fig = None, None
     qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:
-        relevant_params = [f"{transition}_drive_amplitude_pi"]
+        relevant_params = [f"ef_drive_amplitude_pi"]
+
+    # TODO: define datas here - maybe make a fake datadict
 
     # Set plot style
     sqil.set_plot_style(plt)
@@ -128,40 +139,44 @@ def analyze_qubit_temperature(
     has_sweeps = y_data.ndim > 1
     if not has_sweeps:
         try:
-            # Project the data and start plot
-            proj, inv = sqil.fit.transform_data(y_data, inv_transform=True)
-            fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj)
+            # Extract and project the data
+            amplitudes = datadict["amplitude"]
+            proj_no_pi = sqil.fit.transform_data(datadict["data_no_pi"])
+            proj_pi = sqil.fit.transform_data(datadict["data_pi"])
+
+            # Plot
+            fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj_no_pi)
             anal_res.add_figure(fig, "fig", qu_id)
-            # Analyze
-            fit_res_exp = sqil.fit.fit_decaying_oscillations(lengths, proj)
-            fit_res_const = sqil.fit.fit_oscillations(lengths, proj)
-            fit_res = sqil.fit.get_best_fit(
-                fit_res_exp, fit_res_const, recipe="nrmse_aic"
-            )
-
-            anal_res.add_fit(fit_res_exp, "Decaying oscillations", qu_id)
-            anal_res.add_fit(fit_res_const, "Constant oscillations", qu_id)
-            # Update parameters
-            anal_res.add_params(
-                {f"{transition}_drive_length": fit_res.metadata["pi_time"]}, qu_id
-            )
-
-            x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
-            inverse_fit = inv(fit_res.predict(x_fit))
-
-            # Make parameters pretty
-            omega_r = sqil.format_number(1 / fit_res.params_by_name["T"], unit="Hz")
-            t_pi = sqil.format_number(fit_res.metadata["pi_time"], unit="s")
-
-            # Plot the fit
+            # Add pi data to plot
             axs[0].plot(
-                x_fit * x_info.scale, fit_res.predict(x_fit) * y_info.scale, "tab:red"
+                amplitudes * x_info.scale,
+                proj_pi * y_info.scale,
+                "o",
+                color="tab:orange",
             )
             axs[1].plot(
-                inverse_fit.real * y_info.scale,
-                inverse_fit.imag * y_info.scale,
-                "tab:red",
+                np.real(datadict["data_pi"]) * y_info.scale,
+                np.imag(datadict["data_pi"]) * y_info.scale,
+                "o",
+                color="tab:orange",
             )
+            axs[0].legend([r"without $\pi$-pulse", r"with $\pi$-pulse"])
+
+            print(
+                np.real(datadict["data_no_pi"]) * y_info.scale,
+                np.imag(datadict["data_no_pi"]) * y_info.scale,
+            )
+            print(
+                np.real(datadict["data_pi"]) * y_info.scale,
+                np.imag(datadict["data_pi"]) * y_info.scale,
+            )
+
+            P_e_array = 1 - proj_pi / (proj_pi + proj_no_pi)
+            T_qu_array = h * qu_freq / (kb * np.log(1 / P_e_array - 1))
+
+            T_qu = np.mean(T_qu_array)
+            T_qu_error = np.std(T_qu_array)
+
         except Exception as e:
             print("Error while fitting projected data", e)
 
@@ -170,7 +185,7 @@ def analyze_qubit_temperature(
 
     finalize_plot(
         fig,
-        f"Qubit temperature ({transition})",
+        f"Qubit temperature {T_qu*1e3:.1f} mK",
         qu_id,
         fit_res,
         qubit_params,
