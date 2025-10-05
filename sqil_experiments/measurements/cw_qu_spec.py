@@ -9,7 +9,7 @@ from numpy.typing import ArrayLike
 from sqil_core.experiment import ExperimentHandler
 from sqil_core.experiment.instruments.rf_source import RfSource
 from sqil_core.experiment.instruments.vna import VNA
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from sqil_experiments.measurements.helpers.sqil_transmon.operations import (
     SqilTransmonOperations,
@@ -64,7 +64,13 @@ class CW_QuSpec(ExperimentHandler):
         drive.turn_on()
 
         data = np.zeros_like(frequencies, dtype=complex)
-        for i, freq in tqdm(enumerate(frequencies)):
+        bar = tqdm(
+            enumerate(frequencies),
+            desc="Drive frequency",
+            total=len(frequencies),
+            leave=False,
+        )
+        for i, freq in bar:
             drive.set_frequency(freq)
             data[i] = vna.get_IQ_data()
 
@@ -75,5 +81,9 @@ class CW_QuSpec(ExperimentHandler):
     def analyze(self, path, *args, **kwargs):
         relevant_params = kwargs.get("relevant_params")
         if not relevant_params:
-            kwargs["relevant_params"] = ["current", "readout_external_lo_power"]
+            kwargs["relevant_params"] = [
+                "readout_power",
+                "readout_acquire_bandwith",
+                "readout_acquire_averages",
+            ]
         return qu_spec_analysis(path=path, **kwargs)
