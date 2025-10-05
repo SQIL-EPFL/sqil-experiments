@@ -64,5 +64,9 @@ class CW_RRSpec(ExperimentHandler):
     def analyze(self, path, *args, **kwargs):
         relevant_params = kwargs.get("relevant_params")
         if not relevant_params:
-            kwargs["relevant_params"] = ["current", "cw_ro_power"]
+            kwargs["relevant_params"] = [
+                "readout_power",
+                "readout_acquire_bandwith",
+                "readout_acquire_averages",
+            ]
         return rr_spec_analysis(path=path, **kwargs)
