@@ -3,7 +3,7 @@ from pprint import pprint
 import numpy as np
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
 
-from .utils import shfqa_power_calculator
+from sqil_experiments.measurements.helpers.utils import shfqa_power_calculator
 
 
 def get_physical_signal_name(setup, quid, signal_name):
