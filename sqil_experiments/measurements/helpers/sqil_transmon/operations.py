@@ -8,7 +8,7 @@ from laboneq.dsl.enums import ModulationType
 from laboneq.dsl.parameter import SweepParameter
 from laboneq.simple import SectionAlignment, dsl
 
-from .qubit import SqilTransmon
+from sqil_experiments.measurements.helpers.sqil_transmon.qubit import SqilTransmon
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
