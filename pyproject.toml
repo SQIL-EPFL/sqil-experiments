@@ -17,6 +17,7 @@ plottr = ">=0.14.0,<0.15.0"
 laboneq = ">=2.57.0,<3.0.0"
 laboneq-applications = ">=2.11.0,<3.0.0"
 sqil-core = "^1.1.0"
+tqdm = "^4.67.1"
 
 
 [build-system]
