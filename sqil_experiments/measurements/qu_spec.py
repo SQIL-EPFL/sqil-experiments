@@ -180,7 +180,10 @@ def qu_spec_analysis(
                 axs[0].plot(x_fit * x_info.scale, y_fit_mag, color="tab:red")
                 axs[1].plot(x_fit * x_info.scale, y_fit_phase, color="tab:red")
     else:
-        fig, axs = plot_mag_phase(datadict=datadict)
+        invert_sweep_axis = False
+        if sweep_info[0].id == "current":
+            invert_sweep_axis = True
+        fig, axs = plot_mag_phase(datadict=datadict, transpose=invert_sweep_axis)
         anal_res.add_figure(fig, "fig", qu_id)
         fit_res = None
 

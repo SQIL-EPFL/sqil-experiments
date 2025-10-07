@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING, Literal
 
 import attrs
 import numpy as np
-from helpers.laboneq import shfqa_power_calculator
 from laboneq.core.utilities.dsl_dataclass_decorator import classformatter
 from laboneq.dsl.calibration import Calibration, Oscillator, SignalCalibration
 from laboneq.dsl.enums import ModulationType
 from laboneq.dsl.quantum import QuantumElement, QuantumParameters
 from laboneq.simple import dsl
+
+from sqil_experiments.measurements.helpers.laboneq import shfqa_power_calculator
 
 # Make sure to load custom pulses
 from .pulses import *
@@ -182,7 +183,7 @@ class SqilTransmonParameters(QuantumParameters):
     drive_range: float = 10
     readout_range_out: float = 10
     readout_range_in: float = -20
-    ro_power: float = -30
+    cw_ro_power: float = -40
 
     # spectroscopy parameters
 

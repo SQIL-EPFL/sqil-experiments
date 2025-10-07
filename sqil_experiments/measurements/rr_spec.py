@@ -1,22 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import sqil_core as sqil
-from helpers.plottr import DataDict, DDH5Writer
-from helpers.sqil_transmon.operations import SqilTransmonOperations
-from helpers.sqil_transmon.qubit import SqilTransmon
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
 
 # from rr_spec import create_experiment
 from laboneq.dsl.quantum import QPU
 from laboneq.dsl.quantum.quantum_element import QuantumElement
 from laboneq.simple import Experiment, SweepParameter, dsl
-from laboneq.workflow import option_field, task_options, workflow_options
+from laboneq.workflow import option_field, task_options
 from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import BaseExperimentOptions
-from laboneq_applications.qpu_types.tunable_transmon import (
-    TunableTransmonOperations,
-    TunableTransmonQubit,
-)
 from numpy.typing import ArrayLike
 from sqil_core.experiment import ExperimentHandler
 
@@ -242,7 +235,10 @@ def rr_spec_analysis(
                 print(f"Error fitting the magnitude:", e2)
                 fit_res = None
     elif has_sweeps:
-        fig, axs = plot_mag_phase(datadict=datadict)
+        invert_sweep_axis = False
+        if sweep_info[0].id == "current":
+            invert_sweep_axis = True
+        fig, axs = plot_mag_phase(datadict=datadict, transpose=invert_sweep_axis)
         anal_res.add_figure(fig, "fig", qu_id)
 
         sweep0_info = sweep_info[0]
