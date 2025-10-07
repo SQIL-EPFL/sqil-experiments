@@ -62,6 +62,10 @@ instruments = {
         "name": "vna",
         "address": "TCPIP0::192.168.1.203::inst0::INSTR",
         "s_param": "S21",
-        "variables": {"power": bind_instrument_qubit("readout_power", "q0")},
+        "variables": {
+            "power": bind_instrument_qubit("readout_power", "q0"),
+            "bandwidth": bind_instrument_qubit("readout_acquire_bandwith", "q0"),
+            "averages": bind_instrument_qubit("readout_acquire_averages", "q0"),
+        },
     },
 }

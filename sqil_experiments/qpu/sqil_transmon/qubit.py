@@ -183,7 +183,6 @@ class SqilTransmonParameters(QuantumParameters):
     drive_range: float = 10
     readout_range_out: float = 10
     readout_range_in: float = -20
-    cw_ro_power: float = -40
 
     # spectroscopy parameters
 
@@ -204,34 +203,6 @@ class SqilTransmonParameters(QuantumParameters):
     dc_slot: int | None = 0
     dc_voltage_parking: float | None = 0.0
     flux_offset_voltage: float = 0.0
-
-    def replace(self, **changes: dict[str, object]):
-        """Return a new set of parameters with changes applied.
-
-        Arguments:
-            changes:
-                Parameter changes to apply passed as keyword arguments.
-                Dotted key names such as `a.b.c` update nested parameters
-                or items within parameter values that are dictionaries.
-
-        Return:
-            A new parameters instance.
-        """
-        invalid_params = self._get_invalid_param_paths(**changes)
-        if invalid_params:
-            raise ValueError(
-                f"Update parameters do not match the qubit "
-                f"parameters: {invalid_params}",
-            )
-
-        # Automatically update range and amplitude when "power" parameters are changed
-        # TODO: handle all power variables
-        keys = changes.keys()
-        if "ro_power" in keys:
-            range, amp = shfqa_power_calculator(changes["ro_power"])
-            changes = {**changes, "readout_range_out": range, "readout_amplitude": amp}
-
-        return self._nested_evolve(self, **changes)
 
     @property
     def drive_frequency_ge(self) -> float | None:

@@ -35,8 +35,6 @@ class CW_RRSpec(ExperimentHandler):
     def sequence(
         self,
         readout_resonator_frequency: list,
-        bw=1e3,
-        count=1,
         qu_ids=["q0"],
         *params,
         **kwargs,
@@ -55,9 +53,6 @@ class CW_RRSpec(ExperimentHandler):
 
         vna = cast(VNA, self.instruments.vna)
         vna.set_frequency_range(start, stop, n_points)
-        # vna.set_power(power)
-        vna.set_bandwidth(bw)
-        vna.set_averages(count)
 
         return self.instruments.vna.get_IQ_data()
 
