@@ -254,6 +254,7 @@ def analyze_T2_echo(
         T2_scaled = T2s * T2_info.scale
         sweep_scaled = sweeps[0] * sweep_info[0].scale
         fig, axs = plt.subplots(1, 1)
+        anal_res.add_figure(fig, "fig", qu_id)
         axs.plot(sweep_scaled, T2_scaled, ".-")
         axs.axhline(y=T2 * T2_info.scale, color="tab:pink", linestyle="--")
         axs.set_ylabel(T2_info.name_and_unit)
