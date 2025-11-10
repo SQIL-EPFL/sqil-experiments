@@ -25,7 +25,7 @@ initial_readout_lo_freq = 7.2e9
 
 
 # Data storage
-db_root = r"Z:\Projects\BottomLoader\data"
+db_root = r"Z:\Projects\Stormcrow\data"
 db_root_local = r"C:\Users\sqil\Desktop\data_local"
 storage = {
     "db_type": "plottr",
@@ -40,12 +40,8 @@ def generate_zi_setup():
     return generate_device_setup(
         number_qubits=1,
         shfqc=[
-            # {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
-            {
-                "serial": "dev12537",
-                "number_of_channels": 4,
-                "options": "SHFQC/PLUS/QC2CH",
-            }
+            {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
+            # { "serial": "dev12537", "number_of_channels": 4, "options": "SHFQC/PLUS/QC2CH" }
         ],
         include_flux_lines=False,
         multiplex_drive_lines=True,
@@ -77,13 +73,13 @@ instruments = {
         "generate_setup": generate_zi_setup,
         "generate_qpu": generate_qpu,
     },
-    "yoko0": {
-        "type": "CS",
-        "model": "Yokogawa_GS200",
-        "address": "TCPIP0::192.168.1.199::inst0::INSTR",
-        "name": "yoko0",
-        "ramp_step": 1e-6,
-        "ramp_step_delay": 0.008,
-        "variables": {"current": bind_instrument_qubit("current", "q0")},
-    },
+    # "yoko0": {
+    #     "type": "CS",
+    #     "model": "Yokogawa_GS200",
+    #     "address": "TCPIP0::192.168.1.199::inst0::INSTR",
+    #     "name": "yoko0",
+    #     "ramp_step": 1e-6,
+    #     "ramp_step_delay": 0.008,
+    #     "variables": {"current": bind_instrument_qubit("current", "q0")},
+    # },
 }
