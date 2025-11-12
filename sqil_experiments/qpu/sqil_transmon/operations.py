@@ -7,13 +7,13 @@ from laboneq.dsl.calibration import Calibration, Oscillator
 from laboneq.dsl.enums import ModulationType
 from laboneq.dsl.parameter import SweepParameter
 from laboneq.simple import SectionAlignment, dsl
+from laboneq_applications.typing import QuantumElements
 
 from sqil_experiments.qpu.sqil_transmon.qubit import SqilTransmon
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from laboneq_applications.typing import QuantumElements
 
 # TODO: Implement multistate 0-1-2 measurement operation
 
