@@ -20,7 +20,7 @@ from sqil_experiments.qpu.sqil_transmon.qubit import SqilTransmon
 # Checklist for every cooldown
 # - update data_folder_name
 # - update the initial_readout_lo_freq, an approximate value is required to run onetone
-data_folder_name = "20251006_stormcrow_N17"
+data_folder_name = "20251110_stormcrow_N17"
 initial_readout_lo_freq = 7.2e9
 
 
@@ -73,13 +73,14 @@ instruments = {
         "generate_setup": generate_zi_setup,
         "generate_qpu": generate_qpu,
     },
-    # "yoko0": {
-    #     "type": "CS",
-    #     "model": "Yokogawa_GS200",
-    #     "address": "TCPIP0::192.168.1.199::inst0::INSTR",
-    #     "name": "yoko0",
-    #     "ramp_step": 1e-6,
-    #     "ramp_step_delay": 0.008,
-    #     "variables": {"current": bind_instrument_qubit("current", "q0")},
-    # },
+    "yoko0": {
+        "type": "CS",
+        "model": "Yokogawa_GS200",
+        "address": "TCPIP0::192.168.1.201::inst0::INSTR",
+        "name": "yoko0",
+        "ramp_step": 1e-6,
+        "ramp_step_delay": 0.008,
+        "current_range": 10e-3,  # Change when at 0 flux
+        "variables": {"current": bind_instrument_qubit("current", "q0")},
+    },
 }
