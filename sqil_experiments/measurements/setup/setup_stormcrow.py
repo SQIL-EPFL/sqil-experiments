@@ -5,7 +5,10 @@ from helpers.sqil_transmon.operations import SqilTransmonOperations
 from helpers.sqil_transmon.qubit import SqilTransmon
 from laboneq import serializers
 from laboneq.contrib.example_helpers.generate_descriptor import generate_descriptor
-from laboneq.contrib.example_helpers.generate_device_setup import generate_device_setup
+from laboneq.contrib.example_helpers.generate_device_setup import (
+    create_connection,
+    generate_device_setup,
+)
 from laboneq.dsl.quantum import QPU
 from laboneq.simple import DeviceSetup
 from laboneq_applications.qpu_types.tunable_transmon import (
@@ -37,7 +40,7 @@ storage = {
 
 # Zurich Instruments setup
 def generate_zi_setup():
-    return generate_device_setup(
+    setup = generate_device_setup(
         number_qubits=1,
         shfqc=[
             {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
@@ -47,6 +50,12 @@ def generate_zi_setup():
         multiplex_drive_lines=True,
         query_options=False,
     )
+
+    # Create an additional aux channel
+    conn = create_connection(to_signal=f"q0/aux", ports="SGCHANNELS/2/OUTPUT")
+    setup.add_connections(f"shfqc_0", conn)
+
+    return setup
 
 
 def generate_qpu(zi_setup):
@@ -60,6 +69,7 @@ def generate_qpu(zi_setup):
             **{
                 "readout_lo_frequency": initial_readout_lo_freq,
                 "drive_lo_frequency": 5e9,
+                "aux_lo_frequency": 7e9,
             }
         )
     return qpu

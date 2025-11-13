@@ -125,7 +125,11 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             external_lo_frequency = q.parameters.readout_external_lo_frequency or 0
         else:
             signal_line, _ = q.transition_parameters(transition)
-            lo_frequency = q.parameters.drive_lo_frequency
+            lo_frequency = (
+                q.parameters.aux_lo_frequency
+                if transition == "aux"
+                else q.parameters.drive_lo_frequency
+            )
             external_lo_frequency = 0
 
         if rf:
@@ -365,6 +369,10 @@ class SqilTransmonOperations(dsl.QuantumOperations):
                 f" 'passive', or None, not: {reset!r}",
             )
 
+        # Detect auxiliary drive and skip
+        if state == "a":
+            return
+
         if state == "g":
             pass
         elif state == "e":
@@ -383,6 +391,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         self,
         q: SqilTransmon,
         delay: float | SweepParameter | None = None,
+        aux=False,
     ) -> None:
         """Reset a qubit into the ground state, 'g', using a long delay.
 
@@ -394,7 +403,11 @@ class SqilTransmonOperations(dsl.QuantumOperations):
                 to the qubit parameter `reset_delay_length`.
         """
         if delay is None:
-            delay = q.parameters.reset_delay_length
+            delay = (
+                q.parameters.reset_delay_length
+                if not aux
+                else q.parameters.aux_reset_delay_length
+            )
         self.delay.omit_section(q, time=delay)
 
     @dsl.quantum_operation
@@ -442,7 +455,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         """
         drive_line, params = q.transition_parameters(transition)
 
-        if transition == "ef":
+        if transition in ["ef", "aux"]:
             section = dsl.active_section()
             section.on_system_grid = True
 
@@ -1102,6 +1115,36 @@ class SqilTransmonOperations(dsl.QuantumOperations):
                         # Fix the length of the measure section
                         sec.length = measure_section_length
                         self.passive_reset(q)
+
+    @dsl.quantum_operation
+    def aux_drive(
+        self,
+        q: SqilTransmon,
+        transition: str | None = "aux",
+        amplitude: float | SweepParameter | None = None,
+        phase: float = 0.0,
+        length: float | SweepParameter | None = None,
+        pulse: dict | None = None,
+    ) -> None:
+        drive_line, params = q.transition_parameters(transition)
+
+        section = dsl.active_section()
+        section.on_system_grid = True
+
+        if amplitude is None:
+            amplitude = params["amplitude"]
+        if length is None:
+            length = params["length"]
+
+        rx_pulse = dsl.create_pulse(params["pulse"], pulse, name="aux_x_pulse")
+
+        dsl.play(
+            q.signals[drive_line],
+            amplitude=amplitude,
+            phase=phase,
+            length=length,
+            pulse=rx_pulse,
+        )
 
 
 @dsl.pulse_library.register_pulse_functional
