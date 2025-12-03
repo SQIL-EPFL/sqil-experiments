@@ -243,15 +243,18 @@ def analyze_T1(
                 anal_res.add_fit(fit_res, f"fit idx {i}", qu_id)
                 T1s[i] = fit_res.params_by_name["tau"]
 
+        T1s_masked = np.where(T1s > 0, T1s, np.nan)
+        T1s_masked = mask_outliers(T1s_masked)
+
         # Update params
-        T1 = np.mean(T1s)
+        T1 = np.nanmean(T1s_masked)
         anal_res.add_params({f"{transition}_T1": T1}, qu_id)
         if transition == "ge":
             anal_res.add_params({"reset_delay_length": 5.01 * T1}, qu_id)
 
         # Plot
         T1_info = ParamInfo(f"{transition}_T1")
-        T1_scaled = T1s * T1_info.scale
+        T1_scaled = T1s_masked * T1_info.scale
         sweep_scaled = sweeps[0] * sweep_info[0].scale
         fig, axs = plt.subplots(1, 1)
         anal_res.add_figure(fig, "fig", qu_id)

@@ -217,8 +217,13 @@ def analyze_interleaved_T1_echo(
             anal_res.add_fit(fit_res_echo, f"{i} - echo", qu_id)
             T2s[i] = fit_res_echo.params_by_name["tau"]
 
+        T1s_masked = np.where(T1s > 0, T1s, np.nan)
+        T1s_masked = mask_outliers(T1s_masked)
+        T2s_masked = np.where(T2s > 0, T2s, np.nan)
+        T2s_masked = mask_outliers(T2s_masked)
+
         # Update parameters
-        T1, T2 = np.mean(T1s), np.mean(T2s)
+        T1, T2 = np.nanmean(T1s_masked), np.mean(T2s_masked)
         anal_res.add_params(
             {
                 f"{transition}_T1": T1,
@@ -232,8 +237,8 @@ def analyze_interleaved_T1_echo(
     # Plot
     T1_info = ParamInfo(f"{transition}_T1")
     echo_info = ParamInfo(f"{transition}_T2")
-    T1_scaled = T1s * T1_info.scale
-    echo_scaled = T2s * echo_info.scale
+    T1_scaled = T1s_masked * T1_info.scale
+    echo_scaled = T2s_masked * echo_info.scale
 
     if len(proj_T1) == 1:
         sweeps = np.array([[1]])

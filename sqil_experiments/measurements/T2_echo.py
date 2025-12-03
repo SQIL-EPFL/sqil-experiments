@@ -245,13 +245,16 @@ def analyze_T2_echo(
                 anal_res.add_fit(fit_res, f"fit idx {i}", qu_id)
                 T2s[i] = fit_res.params_by_name["tau"]
 
+        T2s_masked = np.where(T2s > 0, T2s, np.nan)
+        T2s_masked = mask_outliers(T2s_masked)
+
         # Update params
-        T2 = np.mean(T2s)
+        T2 = np.nanmean(T2s_masked)
         anal_res.add_params({f"{transition}_T2": T2}, qu_id)
 
         # Plot
         T2_info = ParamInfo(f"{transition}_T2")
-        T2_scaled = T2s * T2_info.scale
+        T2_scaled = T2s_masked * T2_info.scale
         sweep_scaled = sweeps[0] * sweep_info[0].scale
         fig, axs = plt.subplots(1, 1)
         anal_res.add_figure(fig, "fig", qu_id)
