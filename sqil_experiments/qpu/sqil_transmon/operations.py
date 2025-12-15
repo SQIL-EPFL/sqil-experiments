@@ -125,11 +125,12 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             external_lo_frequency = q.parameters.readout_external_lo_frequency or 0
         else:
             signal_line, _ = q.transition_parameters(transition)
-            lo_frequency = (
-                q.parameters.aux_lo_frequency
-                if transition == "aux"
-                else q.parameters.drive_lo_frequency
-            )
+            if transition == "aux":
+                lo_frequency = q.parameters.aux_lo_frequency
+            elif transition == "hdawg":
+                lo_frequency = 0
+            else:
+                lo_frequency = q.parameters.drive_lo_frequency
             external_lo_frequency = 0
 
         if rf:
@@ -370,7 +371,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             )
 
         # Detect auxiliary drive and skip
-        if state == "a":
+        if state in ["a", "h"]:
             return
 
         if state == "g":
@@ -914,6 +915,8 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             on_system_grid = True
         elif transition == "ge":
             on_system_grid = False
+        elif transition == "hdawg":
+            on_system_grid = False
         else:
             raise ValueError(f"Support only ge or ef transitions, not {transition!r}")
 
@@ -1137,6 +1140,36 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             length = params["length"]
 
         rx_pulse = dsl.create_pulse(params["pulse"], pulse, name="aux_x_pulse")
+
+        dsl.play(
+            q.signals[drive_line],
+            amplitude=amplitude,
+            phase=phase,
+            length=length,
+            pulse=rx_pulse,
+        )
+
+    @dsl.quantum_operation
+    def hdawg_drive(
+        self,
+        q: SqilTransmon,
+        transition: str | None = "hdawg",
+        amplitude: float | SweepParameter | None = None,
+        phase: float = 0.0,
+        length: float | SweepParameter | None = None,
+        pulse: dict | None = None,
+    ) -> None:
+        drive_line, params = q.transition_parameters(transition)
+
+        section = dsl.active_section()
+        section.on_system_grid = True
+
+        if amplitude is None:
+            amplitude = params["amplitude_pi"]
+        if length is None:
+            length = params["length"]
+
+        rx_pulse = dsl.create_pulse(params["pulse"], pulse, name="hdawg_x_pulse")
 
         dsl.play(
             q.signals[drive_line],

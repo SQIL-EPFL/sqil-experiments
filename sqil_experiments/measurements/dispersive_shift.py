@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import sqil_core as sqil
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
 
 # from rr_spec import create_experiment
@@ -11,7 +10,8 @@ from laboneq.workflow import option_field, task_options
 from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import BaseExperimentOptions
 from numpy.typing import ArrayLike
-from sqil_core.experiment import AnalysisResult, ExperimentHandler
+from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
+from sqil_core.utils import *
 
 from sqil_experiments.measurements.rr_spec import rr_spec_analysis
 
@@ -91,8 +91,7 @@ class DispersiveShift(ExperimentHandler):
             "role": "x-axis",
             "unit": "Hz",
             "scale": 1e-9,
-        },  # FIXME: changing this name adds an extra dimension to the data
-        # YES! it must have the same name as he input arguemnt!
+        },
     }
 
     def sequence(
@@ -116,7 +115,7 @@ class DispersiveShift(ExperimentHandler):
     def analyze(self, path, *args, **kwargs):
         anal_res: AnalysisResult = AnalysisResult()
 
-        datadict = sqil.extract_h5_data(path, get_metadata=True)
+        datadict = extract_h5_data(path, get_metadata=True)
 
         schema_g = {**datadict["metadata"]["schema"]}
         schema_e = {**datadict["metadata"]["schema"]}
@@ -130,7 +129,7 @@ class DispersiveShift(ExperimentHandler):
         datadict["metadata"]["schema"] = schema_e
         anal_res_e = rr_spec_analysis(datadict=datadict, path=path, **kwargs)
 
-        sqil.set_plot_style(plt)
+        set_plot_style(plt)
         # fig, ax = plt.subplots(1,1)
         # ax.plot()
 
