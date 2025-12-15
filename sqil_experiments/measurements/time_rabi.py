@@ -65,7 +65,7 @@ def create_experiment(
         reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
         with dsl.sweep(name="time_rabi_sweep", parameter=sweep_param) as pulse_len:
-            with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
+            with dsl.section(name="rabi drive", alignment=SectionAlignment.RIGHT):
                 qop.prepare_state(qubit, state=opts.transition[0])
                 qop.x180(
                     q=qubit,
@@ -180,6 +180,7 @@ def analyze_time_rabi(
 
     elif has_sweeps:
         fig, axs = plot_mag_phase(datadict=datadict, raw=True)
+        anal_res.add_figure(fig, "fig", qu_id)
 
     finalize_plot(
         fig,
