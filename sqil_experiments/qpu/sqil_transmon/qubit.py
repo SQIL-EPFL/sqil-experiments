@@ -165,6 +165,16 @@ class SqilTransmonParameters(QuantumParameters):
     )
     aux_reset_delay_length: float = 100e-9
 
+    # hdawg parameters
+    resonance_frequency_hdawg: float = 100e6
+    hdawg_range: float = 5
+    hdawg_drive_amplitude_pi: float = 0.8
+    hdawg_drive_amplitude_pi2: float = 0.4
+    hdawg_drive_length: float = 50e-9
+    hdawg_drive_pulse: dict = attrs.field(
+        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
+    )
+
     # qubit-resonator coupling parameters
 
     qubit_resonator_coupling_strength_g: float = 0
@@ -268,13 +278,9 @@ class SqilTransmon(QuantumElement):
         "drive",
         "measure",
     )
-    OPTIONAL_SIGNALS = (
-        "drive_ef",
-        "aux",
-        "flux",
-    )
+    OPTIONAL_SIGNALS = ("drive_ef", "aux", "flux", "hdawg")
 
-    TRANSITIONS = ("ge", "ef", "aux")
+    TRANSITIONS = ("ge", "ef", "aux", "hdawg")
 
     def transition_parameters(self, transition: str | None = None) -> tuple[str, dict]:
         """Return the transition drive signal line and parameters.
@@ -304,9 +310,13 @@ class SqilTransmon(QuantumElement):
         if transition == "aux":
             line = "aux"
             param_keys = ["amplitude", "length", "pulse"]
+        elif transition == "hdawg":
+            line = "hdawg"
+            param_keys = ["amplitude_pi", "amplitude_pi2", "length", "pulse"]
         else:
             line = "drive" if transition == "ge" else "drive_ef"
             param_keys = ["amplitude_pi", "amplitude_pi2", "length", "pulse"]
+
         params = {
             k: getattr(self.parameters, f"{transition}_drive_{k}") for k in param_keys
         }
@@ -542,4 +552,15 @@ class SqilTransmon(QuantumElement):
             calibration_items[self.signals["flux"]] = SignalCalibration(
                 voltage_offset=self.parameters.flux_offset_voltage,
             )
+        if "hdawg" in self.signals:
+            sig_cal = SignalCalibration()
+            if self.parameters.resonance_frequency_hdawg is not None:
+                sig_cal.oscillator = Oscillator(
+                    uid=f"{self.uid}_drive_hdawg_ge_osc",
+                    frequency=self.parameters.resonance_frequency_hdawg,
+                    modulation_type=ModulationType.AUTO,
+                )
+            # sig_cal.local_oscillator = drive_lo
+            sig_cal.range = self.parameters.hdawg_range
+            calibration_items[self.signals["hdawg"]] = sig_cal
         return Calibration(calibration_items)

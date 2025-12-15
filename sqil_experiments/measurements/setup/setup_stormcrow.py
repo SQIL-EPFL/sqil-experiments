@@ -46,14 +46,18 @@ def generate_zi_setup():
             {"serial": "dev12183", "number_of_channels": 4, "options": "SHFQC/QC4CH"}
             # { "serial": "dev12537", "number_of_channels": 4, "options": "SHFQC/PLUS/QC2CH" }
         ],
+        pqsc=[{"serial": "dev10218"}],
+        hdawg=[{"serial": "dev9131", "options": "HDAWG8"}],
         include_flux_lines=False,
         multiplex_drive_lines=True,
-        query_options=False,
     )
 
     # Create an additional aux channel
     conn = create_connection(to_signal=f"q0/aux", ports="SGCHANNELS/2/OUTPUT")
     setup.add_connections(f"shfqc_0", conn)
+
+    conn = create_connection(to_signal=f"q0/hdawg", ports="SIGOUTS/0")
+    setup.add_connections("hdawg_0", conn)
 
     return setup
 
