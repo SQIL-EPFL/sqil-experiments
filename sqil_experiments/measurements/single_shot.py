@@ -82,17 +82,17 @@ def create_experiment(
         repetition_time=opts.repetition_time,
         reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
-        # with dsl.section(
-        #     name="State preparation",
-        #     alignment=SectionAlignment.RIGHT,
-        # ):
-        #     for q in qubits:
-        #         for s0 in initial_states:
+
+        # for s0 in initial_states:
+        #     with dsl.section(
+        #         name="State preparation",
+        #         alignment=SectionAlignment.RIGHT,
+        #     ):
+        #         for q in qubits:
         #             qop.prepare_state.omit_section(q, s0)
 
-        # with dsl.section(name="Measure", alignment=SectionAlignment.LEFT):
-        #     for q in qubits:
-        #         for s0 in initial_states:
+        #     with dsl.section(name="Measure", alignment=SectionAlignment.LEFT):
+        #         for q in qubits:
         #             qop.measure(q, dsl.handles.result_handle(f"{q.uid}/{s0}"))
         #             qop.passive_reset(q)
 
@@ -164,10 +164,14 @@ def analyze_single_shot(
     if not has_sweeps:
         fig, ax = plt.subplots(1, 1, figsize=(12, 10))
         anal_res.add_figure(fig, "fig", qu_id)
-        ax.scatter(np.real(g), np.imag(g), alpha=0.1)
-        ax.scatter(np.real(e), np.imag(e), alpha=0.1)
+        ax.scatter(np.real(g), np.imag(g), alpha=0.1, label="g")
+        ax.scatter(np.real(e), np.imag(e), alpha=0.1, label="e")
         ax.grid(True)
         ax.set_aspect("equal")
+        ax.legend()
+
+        ax.plot(np.mean(g.real), np.mean(g.imag), "x", color="black")
+        ax.plot(np.mean(e.real), np.mean(e.imag), "x", color="black")
 
     finalize_plot(
         fig,
