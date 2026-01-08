@@ -73,9 +73,9 @@ def create_experiment(
                 name=f"freqs_{q.uid}",
                 parameter=SweepParameter(f"frequency_{q.uid}", q_frequencies),
             ) as frequency:
+                qop.prepare_state.omit_section(q, state=transition[0])
                 with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
-                    qop.prepare_state(q, state=transition[0])
-                    qop.set_frequency(q, frequency)
+                    qop.set_frequency(q, frequency, transition=transition)
                     qop.qubit_spectroscopy_drive(q, transition=transition)
                     sec = qop.measure(q, dsl.handles.result_handle(q.uid))
                     # we fix the length of the measure section to the longest section among
