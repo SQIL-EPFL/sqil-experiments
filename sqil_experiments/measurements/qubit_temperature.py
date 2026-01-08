@@ -164,7 +164,7 @@ def analyze_qubit_temperature(
 
             T_qu, P_e = compute_qubit_temp(proj_pi, proj_no_pi, qu_freq)
 
-            anal_res.add_result({"T": T_qu, "P_e": P_e}, qu_id)
+            anal_res.add_output({"T": T_qu, "P_e": P_e}, qu_id)
 
         except Exception as e:
             print("Error while fitting projected data", e)
@@ -182,7 +182,7 @@ def analyze_qubit_temperature(
         T_qu_arr, P_e_arr = mask_outliers(T_qu_arr), mask_outliers(P_e_arr)
         T_qu, T_qu_std = np.nanmean(T_qu_arr), np.nanstd(T_qu_arr)
         P_e, P_e_std = np.nanmean(P_e_arr), np.nanstd(P_e_arr)
-        anal_res.add_result(
+        anal_res.add_output(
             {"T": T_qu, "T_std": T_qu_std, "P_e": P_e, "P_e_std": P_e_std}, qu_id
         )
 
