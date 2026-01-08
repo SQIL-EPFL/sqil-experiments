@@ -1,17 +1,3 @@
-# Copyright 2024 Zurich Instruments AG
-# SPDX-License-Identifier: Apache-2.0
-
-"""This module defines the IQ_blob experiment.
-
-In this experiment, we perform single-shot measurements with the qubits prepared
-in the states g, e, and/or f.
-
-The IQ blob experiment has the following pulse sequence:
-
-    qb --- [ prepare transition ] --- [ measure ]
-
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -20,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from laboneq import serializers, workflow
 from laboneq.simple import AveragingMode, Experiment, SectionAlignment, dsl
-from laboneq_applications.analysis.iq_blobs import analysis_workflow
 from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import BaseExperimentOptions
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
@@ -34,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @workflow.task_options(base_class=BaseExperimentOptions)
-class SingleShotOptions:
+class IQBlobsOptions:
     averaging_mode: AveragingMode = workflow.option_field(
         AveragingMode.SINGLE_SHOT, description="Averaging mode used for the experiment"
     )
@@ -45,7 +30,7 @@ def create_experiment(
     qpu: QPU,
     qubits: QuantumElements,
     initial_states: Sequence[str],
-    options: SingleShotOptions | None = None,
+    options: IQBlobsOptions | None = None,
 ) -> Experiment:
     """Creates an IQ-blob Experiment.
 
@@ -54,7 +39,7 @@ def create_experiment(
             The qpu consisting of the original qubits and quantum operations.
         qubits:
             The qubit to run the experiments on.
-        states:
+        initial_states:
             The basis states the qubits should be prepared in. May be either a string,
             e.g. "gef", or a list of letters, e.g. ["g","e","f"].
         options:
@@ -66,7 +51,7 @@ def create_experiment(
             The generated LabOne Q experiment instance to be compiled and executed.
     """
     # Define the custom options for the experiment
-    opts = SingleShotOptions() if options is None else options
+    opts = IQBlobsOptions() if options is None else options
     qubits = validation.validate_and_convert_qubits_sweeps(qubits)
 
     # We will fix the length of the measure section to the longest section among
@@ -83,6 +68,7 @@ def create_experiment(
         reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
 
+        # Equivalent pulse sequence
         # for s0 in initial_states:
         #     with dsl.section(
         #         name="State preparation",
@@ -106,23 +92,27 @@ def create_experiment(
         )
 
 
-class SingleShot(ExperimentHandler):
-    exp_name = "single_shot"
-    db_schema = {
-        "g": {"role": "data", "unit": "V", "scale": 1e3},
-        "e": {"role": "data", "unit": "V", "scale": 1e3},
-        "initial_states": {"role": "param"},
-    }
+class IQBlobs(ExperimentHandler):
+    exp_name = "iq_blobs"
+    db_schema = {}  # Dynamic schema computed before experiment
 
     def __init__(self, setup_path="", emulation=False, server=False, is_zi_exp=None):
         super().__init__(setup_path, emulation, server, is_zi_exp)
         self.save_zi_result = True
 
+    def on_before_experiment(self, *args, **kwargs):
+        self.db_schema = {
+            "initial_states": {"role": "param"},
+        }
+        initial_states = self.run_args[0][0]
+        for s in initial_states:
+            self.db_schema.update({s: {"role": "data", "unit": "V", "scale": 1e3}})
+
     def sequence(
         self,
         initial_states,
         qu_ids=["q0"],
-        options: SingleShotOptions | None = None,
+        options: IQBlobsOptions | None = None,
         *params,
         **kwargs,
     ):
@@ -130,16 +120,11 @@ class SingleShot(ExperimentHandler):
         return create_experiment(self.qpu, qubits, initial_states, options=options)
 
     def analyze(self, path, *args, **kwargs):
-        # exp_result = serializers.load(f"{path}/zi_result.json")
-        # res = analysis_workflow(exp_result, self.qpu.quantum_elements, ["g", "e"]).run()
-        # return res
-        return analyze_single_shot(path=path, **kwargs)
+        return analyze_iq_blobs(path=path, **kwargs)
 
 
 @multi_qubit_handler
-def analyze_single_shot(
-    datadict, qpu=None, qu_id="q0", transition="ge", relevant_params=None, **kwargs
-):
+def analyze_iq_blobs(datadict, qpu=None, qu_id="q0", relevant_params=None, **kwargs):
     # Prepare analysis result object
     anal_res = AnalysisResult()
 
@@ -148,34 +133,51 @@ def analyze_single_shot(
     x_data, y_data, sweeps = qu_data
     x_info, y_info, sweep_info = qu_info
 
-    g = datadict["g"]
-    e = datadict["e"]
+    # Look at the entries in the db schema to extract the measured states
+    db_schema_keys = list(datadict["metadata"]["schema"].keys())
+    db_schema_keys.remove("initial_states")
+    states = db_schema_keys
 
     fit_res, fig = None, None
     qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:
-        relevant_params = [f"{transition}_drive_amplitude_pi"]
+        if "e" in states:
+            relevant_params = [f"ge_drive_amplitude_pi"]
+        if "f" in states:
+            relevant_params = [f"ef_drive_amplitude_pi"]
 
     # Set plot style
     set_plot_style(plt)
+
+    blob_colors = {"g": "tab:blue", "e": "tab:orange", "f": "tab:green"}
+    edge_colors = {"g": "cyan", "e": "yellow", "f": "lime"}
 
     has_sweeps = y_data.ndim > 1
     if not has_sweeps:
         fig, ax = plt.subplots(1, 1, figsize=(12, 10))
         anal_res.add_figure(fig, "fig", qu_id)
-        ax.scatter(np.real(g), np.imag(g), alpha=0.1, label="g")
-        ax.scatter(np.real(e), np.imag(e), alpha=0.1, label="e")
+
+        for s in states:
+            state = 1e3 * datadict.get(s, np.nan)
+            ax.scatter(
+                np.real(state),
+                np.imag(state),
+                alpha=0.1,
+                color=blob_colors[s],
+                zorder=-1,
+            )
+            plot_IQ_ellipse(state, ax, color=edge_colors[s], label=s, conf=0.99)
+
         ax.grid(True)
         ax.set_aspect("equal")
+        ax.set_xlabel("In-phase [mV]")
+        ax.set_ylabel("Quadrature [mV]")
         ax.legend()
-
-        ax.plot(np.mean(g.real), np.mean(g.imag), "x", color="black")
-        ax.plot(np.mean(e.real), np.mean(e.imag), "x", color="black")
 
     finalize_plot(
         fig,
-        f"Single shot ({transition})",
+        f"IQ blobs",
         qu_id,
         fit_res,
         qubit_params,
