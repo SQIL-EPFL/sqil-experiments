@@ -150,74 +150,81 @@ def analyze_ramsey(
     # Set plot style
     set_plot_style(plt)
 
-    # Plot raw data and extract projection
-    fig, axs, proj, inv = plot_projection_IQ(datadict=datadict, full_output=True)
-    anal_res.add_figure(fig, "fig", qu_id)
+    has_sweeps = y_data.ndim > 1
+    if not has_sweeps:
+        # Plot raw data and extract projection
+        fig, axs, proj, inv = plot_projection_IQ(datadict=datadict, full_output=True)
+        anal_res.add_figure(fig, "fig", qu_id)
 
-    # Try to fit the sum of 1, 2 and 3 decaying oscillations and see which one fits best
-    best_fit = None
-    n_oscillation = [1, 2, 3]
-    for n in n_oscillation:
-        try:
-            fit_res = fit.fit_many_decaying_oscillations(x_data, proj, n)
-        except:
-            fit_res = None
-        if fit_res is not None:
-            anal_res.add_fit(fit_res, f"{n} oscillations", qu_id)
-            if best_fit is None:
-                best_fit = fit_res
-                continue
-            best_fit = fit.get_best_fit(best_fit, fit_res, recipe="nrmse_aic")
+        # Try to fit the sum of 1, 2 and 3 decaying oscillations and see which one fits best
+        best_fit = None
+        n_oscillation = [1, 2, 3]
+        for n in n_oscillation:
+            try:
+                fit_res = fit.fit_many_decaying_oscillations(x_data, proj, n)
+            except:
+                fit_res = None
+            if fit_res is not None:
+                anal_res.add_fit(fit_res, f"{n} oscillations", qu_id)
+                if best_fit is None:
+                    best_fit = fit_res
+                    continue
+                best_fit = fit.get_best_fit(best_fit, fit_res, recipe="nrmse_aic")
 
-    if best_fit is not None:
-        # Update parameters
-        taus = [
-            best_fit.params_by_name.get(f"tau{n}", np.inf)
-            for n in range(len(n_oscillation))
-        ]
-        T2_star = np.min(taus)
-        anal_res.add_params({f"{transition}_T2_star": T2_star}, qu_id)
+        if best_fit is not None:
+            fit_res = best_fit
+            # Update parameters
+            taus = [
+                best_fit.params_by_name.get(f"tau{n}", np.inf)
+                for n in range(len(n_oscillation))
+            ]
+            T2_star = np.min(taus)
+            anal_res.add_params({f"{transition}_T2_star": T2_star}, qu_id)
 
-        x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
-        inverse_fit = inv(best_fit.predict(x_fit))
+            x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
+            inverse_fit = inv(best_fit.predict(x_fit))
 
-        # Plot the fit
-        axs[0].plot(
-            x_fit * x_info.scale, best_fit.predict(x_fit) * y_info.scale, "tab:red"
+            # Plot the fit
+            axs[0].plot(
+                x_fit * x_info.scale, best_fit.predict(x_fit) * y_info.scale, "tab:red"
+            )
+            axs[1].plot(
+                inverse_fit.real * y_info.scale,
+                inverse_fit.imag * y_info.scale,
+                "tab:red",
+            )
+
+        # Plot FFT
+        x_fft, y_fft = compute_fft(x_data, proj)
+        x_peaks, y_peaks = get_peaks(x_fft, y_fft)
+        set_plot_style(plt)
+        fig2, ax2 = plt.subplots(1, 1)
+        ax2.plot(x_fft / 1e6, y_fft)
+        ax2.scatter(
+            x_peaks / 1e6,
+            y_peaks,
+            color="tab:red",
+            marker="x",
+            zorder=3,
+            s=100,
+            label="Peaks",
         )
-        axs[1].plot(
-            inverse_fit.real * y_info.scale,
-            inverse_fit.imag * y_info.scale,
-            "tab:red",
-        )
+        ax2.set_xlabel("Frequency [MHz]")
+        ax2.set_ylabel("FFT amplitude")
+        ax2.set_title("Fourier transform")
+        ax2.legend()
+        fig2.tight_layout()
+        anal_res.add_figure(fig2, "fft", qu_id)
 
-    # Plot FFT
-    x_fft, y_fft = compute_fft(x_data, proj)
-    x_peaks, y_peaks = get_peaks(x_fft, y_fft)
-    set_plot_style(plt)
-    fig2, ax2 = plt.subplots(1, 1)
-    ax2.plot(x_fft / 1e6, y_fft)
-    ax2.scatter(
-        x_peaks / 1e6,
-        y_peaks,
-        color="tab:red",
-        marker="x",
-        zorder=3,
-        s=100,
-        label="Peaks",
-    )
-    ax2.set_xlabel("Frequency [MHz]")
-    ax2.set_ylabel("FFT amplitude")
-    ax2.set_title("Fourier transform")
-    ax2.legend()
-    fig2.tight_layout()
-    anal_res.add_figure(fig2, "fft", qu_id)
+    else:
+        fig, axs = plot_mag_phase(datadict=datadict, raw=True)
+        anal_res.add_figure(fig, "fig", qu_id)
 
     finalize_plot(
         fig,
         f"Ramsey ({transition})",
         qu_id,
-        best_fit,
+        fit_res,
         qubit_params,
         updated_params=anal_res.updated_params.get(qu_id, {}),
         sweep_info=sweep_info,
