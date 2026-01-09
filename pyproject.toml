@@ -6,7 +6,7 @@ authors = ["Andrea Duina"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0"
+python = ">=3.12,<4.0"
 numpy = ">=2.2.3,<3.0.0"
 scipy = ">=1.15.1,<2.0.0"
 matplotlib = ">=3.10.0,<4.0.0"
@@ -17,6 +17,7 @@ plottr = ">=0.14.0,<0.15.0"
 tqdm = "^4.67.1"
 laboneq = "^25.10.3"
 laboneq-applications = "^25.10.0"
+sqil-core = "^2.0.0"
 
 
 [build-system]
