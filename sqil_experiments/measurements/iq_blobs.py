@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
-from laboneq import serializers, workflow
+from laboneq import workflow
 from laboneq.simple import AveragingMode, Experiment, SectionAlignment, dsl
 from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import BaseExperimentOptions
@@ -32,24 +32,6 @@ def create_experiment(
     initial_states: Sequence[str],
     options: IQBlobsOptions | None = None,
 ) -> Experiment:
-    """Creates an IQ-blob Experiment.
-
-    Arguments:
-        qpu:
-            The qpu consisting of the original qubits and quantum operations.
-        qubits:
-            The qubit to run the experiments on.
-        initial_states:
-            The basis states the qubits should be prepared in. May be either a string,
-            e.g. "gef", or a list of letters, e.g. ["g","e","f"].
-        options:
-            The options for building the experiment as an instance of
-            [IQBlobExperimentOptions]. See the docstring of this class for more details.
-
-    Returns:
-        experiment:
-            The generated LabOne Q experiment instance to be compiled and executed.
-    """
     # Define the custom options for the experiment
     opts = IQBlobsOptions() if options is None else options
     qubits = validation.validate_and_convert_qubits_sweeps(qubits)

@@ -2,8 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sqil_core as sqil
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
-
-# from rr_spec import create_experiment
 from laboneq.dsl.quantum import QPU
 from laboneq.dsl.quantum.quantum_element import QuantumElement
 from laboneq.simple import Experiment, SweepParameter, dsl
@@ -11,25 +9,13 @@ from laboneq.workflow import option_field, task_options
 from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import BaseExperimentOptions
 from numpy.typing import ArrayLike
-from sqil_core.experiment import ExperimentHandler
+from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
+from sqil_core.fit import FitQuality
+from sqil_core.utils import *
 
 
 @task_options(base_class=BaseExperimentOptions)
-class ResonatorSpectroscopyExperimentOptions:
-    """Base options for the resonator spectroscopy experiment.
-
-    Additional attributes:
-        use_cw:
-            Perform a CW spectroscopy where no measure pulse is played.
-            Default: False.
-        spectroscopy_reset_delay:
-            How long to wait after an acquisition in seconds.
-            Default: 1e-6.
-        acquisition_type:
-            Acquisition type to use for the experiment.
-            Default: `AcquisitionType.SPECTROSCOPY`.
-    """
-
+class RRSpecOptions:
     use_cw: bool = option_field(
         False, description="Perform a CW spectroscopy where no measure pulse is played."
     )
@@ -52,10 +38,10 @@ def create_experiment(
     qpu: QPU,
     qubit: QuantumElement,
     frequencies: ArrayLike,
-    options: ResonatorSpectroscopyExperimentOptions | None = None,
+    options: RRSpecOptions | None = None,
 ) -> Experiment:
     # Define the custom options for the experiment
-    opts = ResonatorSpectroscopyExperimentOptions() if options is None else options
+    opts = RRSpecOptions() if options is None else options
     qubit, frequencies = validation.validate_and_convert_single_qubit_sweeps(
         qubit, frequencies
     )
@@ -105,7 +91,7 @@ class RRSpec(ExperimentHandler):
         self,
         readout_resonator_frequency: list,
         qu_ids=["q0"],
-        options: ResonatorSpectroscopyExperimentOptions | None = None,
+        options: RRSpecOptions | None = None,
         *params,
         **kwargs,
     ):
@@ -120,47 +106,7 @@ class RRSpec(ExperimentHandler):
         )
 
     def analyze(self, path, *args, **kwargs):
-        # data, freq, sweep = sqil.extract_h5_data(
-        #     path, ["data", "frequencies", "sweep0"]
-        # )
-        # options = kwargs.get("options", ResonatorSpectroscopyExperimentOptions())
-
-        # result = None
-
-        # if options.averaging_mode == AveragingMode.SINGLE_SHOT:
-        #     fig, ax = plt.subplots(1, 1, figsize=(16, 5))
-        #     linmag = np.abs(data[0])
-        #     ax.errorbar(
-        #         freq[0],
-        #         np.mean(linmag, axis=0),
-        #         np.std(linmag, axis=0),
-        #         fmt="-o",
-        #         color="tab:blue",
-        #         label="Mean with Error",
-        #         ecolor="tab:orange",
-        #         capsize=5,
-        #         capthick=2,
-        #         elinewidth=2,
-        #         markersize=5,
-        #     )
-        # else:
-        #     is1D = np.array(data).ndim == 1
-        #     if is1D:
-        #         fig, ax = plt.subplots(1, 1)
-        #         ax.plot(freq, np.abs(data))
-        #     else:
-        #         fig, ax = plt.subplots(1, 1)
-        #         ax.pcolormesh(freq, sweep, np.abs(data))
-
         return rr_spec_analysis(path=path, **kwargs)
-        # fig.savefig(f"{path}/fig.png")
-
-
-from sqil_core.experiment import AnalysisResult, multi_qubit_handler
-from sqil_core.fit import FitQuality
-from sqil_core.utils import *
-
-# map_data_dict, extract_h5_data, param_info_from_schema, enrich_qubit_params, get_relevant_exp_parameters, plot_mag_phase, ONE_TONE_PARAMS, ParamInfo
 
 
 @multi_qubit_handler
@@ -196,7 +142,7 @@ def rr_spec_analysis(
     x_data_scaled = x_data * x_info.scale
     y_data_scaled = y_data * y_info.scale
 
-    sqil.set_plot_style(plt)
+    set_plot_style(plt)
     if not has_sweeps:
         y_unit = y_info.unit
 
@@ -309,12 +255,12 @@ def analyze_rr_complex_data(
         ufit = np.unwrap(np.angle(y_fit_scaled))
         phase_offset = -ufit[fr_idx_fit] + uphase[fr_idx_data]
         # y_fit_scaled *= np.exp(1j * phase_offset)
-    axs[0].plot(np.real(y_fit_scaled), np.imag(y_fit_scaled), color="tab:orange")
-    axs[1].plot(x_fit * x_info.scale, np.abs(y_fit_scaled), color="tab:orange")
+    axs[0].plot(np.real(y_fit_scaled), np.imag(y_fit_scaled), color="tab:red")
+    axs[1].plot(x_fit * x_info.scale, np.abs(y_fit_scaled), color="tab:red")
     axs[2].plot(
         x_fit * x_info.scale,
         np.unwrap(np.angle(y_fit_scaled)) + phase_offset,
-        color="tab:orange",
+        color="tab:red",
     )
     return anal_res
 
@@ -337,7 +283,7 @@ def analyze_rr_magnitude(qu_data, qu_info, axs, qu_id) -> AnalysisResult:
     # Plot
     x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))
     y_fit = np.sqrt(fit_res.predict(x_fit)) * np.max(np.abs(y_data))
-    axs[1].plot(x_fit * x_info.scale, y_fit * y_info.scale, color="tab:orange")
+    axs[1].plot(x_fit * x_info.scale, y_fit * y_info.scale, color="tab:red")
 
     return anal_res
 

@@ -4,27 +4,20 @@ from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
-import sqil_core as sqil
-from laboneq.dsl.enums import AcquisitionType, AveragingMode
+import sqil_core.fit as fit
+from laboneq.dsl.enums import AveragingMode
 from laboneq.dsl.quantum import QPU
-from laboneq.dsl.quantum.quantum_element import QuantumElement
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
-from laboneq.workflow import option_field, task_options
 from laboneq_applications.analysis.ramsey import validate_and_convert_detunings
 from laboneq_applications.core import validation
-from laboneq_applications.experiments.options import (
-    BaseExperimentOptions,
-    TuneupExperimentOptions,
-)
+from laboneq_applications.experiments.options import TuneupExperimentOptions
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from laboneq.dsl.quantum import TransmonParameters
     from laboneq.dsl.quantum.qpu import QPU
-    from laboneq.dsl.session import Session
     from laboneq_applications.typing import QuantumElements, QubitSweepPoints
 
 
@@ -36,70 +29,6 @@ def create_experiment(
     detunings: float | Sequence[float] | None = None,
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
-    """Creates a Ramsey Experiment.
-
-    Arguments:
-        qpu:
-            The qpu consisting of the original qubits and quantum operations.
-        qubits:
-            The qubits to run the experiments on. May be either a single
-            qubit or a list of qubits.
-        delays:
-            The delays (in seconds) of the second x90 pulse to sweep over for each
-            qubit. If `qubits` is a single qubit, `delays` must be a list of numbers
-            or an array. Otherwise, it must be a list of lists of numbers or arrays.
-        detunings:
-            The detuning in Hz introduced in order to generate oscillations of the qubit
-            state vector around the Bloch sphere. This detuning and the frequency of the
-            fitted oscillations is used to calculate the true qubit resonance frequency.
-            `detunings` is a list of float values for each qubit following the order
-            in `qubits`.
-        options:
-            The options for building the experiment.
-            See [TuneupExperimentOptions] and [BaseExperimentOptions] for
-            accepted options.
-            Overwrites the options from [TuneupExperimentOptions] and
-            [BaseExperimentOptions].
-
-    Returns:
-        experiment:
-            The generated LabOne Q experiment instance to be compiled and executed.
-
-    Raises:
-        ValueError:
-            If the lengths of `qubits` and `delays` do not match.
-
-        ValueError:
-            If `delays` is not a list of numbers when a single qubit is passed.
-
-        ValueError:
-            If `delays` is not a list of lists of numbers when a list of qubits
-            is passed.
-
-        ValueError:
-            If the experiment uses calibration traces and the averaging mode is
-            sequential.
-
-    Example:
-        ```python
-        options = TuneupExperimentOptions()
-        qpu = QPU(
-            qubits=[TunableTransmonQubit("q0"), TunableTransmonQubit("q1")],
-            quantum_operations=TunableTransmonOperations(),
-        )
-        temp_qubits = qpu.copy_qubits()
-        create_experiment(
-            qpu=qpu,
-            qubits=temp_qubits,
-            delays=[
-                np.linspace(0, 20e-6, 51),
-                np.linspace(0, 30e-6, 52),
-            ],
-            detunings = [1e6, 1.346e6],
-            options=options,
-        )
-        ```
-    """
     # Define the custom options for the experiment
     opts = TuneupExperimentOptions() if options is None else options
     qubits, delays = validation.validate_and_convert_qubits_sweeps(qubits, delays)
@@ -219,10 +148,10 @@ def analyze_ramsey(
         relevant_params = [f"{transition}_drive_amplitude_pi"]
 
     # Set plot style
-    sqil.set_plot_style(plt)
+    set_plot_style(plt)
 
     # Plot raw data and extract projection
-    fig, axs, proj, inv = sqil.plot_projection_IQ(datadict=datadict, full_output=True)
+    fig, axs, proj, inv = plot_projection_IQ(datadict=datadict, full_output=True)
     anal_res.add_figure(fig, "fig", qu_id)
 
     # Try to fit the sum of 1, 2 and 3 decaying oscillations and see which one fits best
@@ -230,7 +159,7 @@ def analyze_ramsey(
     n_oscillation = [1, 2, 3]
     for n in n_oscillation:
         try:
-            fit_res = sqil.fit.fit_many_decaying_oscillations(x_data, proj, n)
+            fit_res = fit.fit_many_decaying_oscillations(x_data, proj, n)
         except:
             fit_res = None
         if fit_res is not None:
@@ -238,7 +167,7 @@ def analyze_ramsey(
             if best_fit is None:
                 best_fit = fit_res
                 continue
-            best_fit = sqil.fit.get_best_fit(best_fit, fit_res, recipe="nrmse_aic")
+            best_fit = fit.get_best_fit(best_fit, fit_res, recipe="nrmse_aic")
 
     if best_fit is not None:
         # Update parameters
@@ -263,9 +192,9 @@ def analyze_ramsey(
         )
 
     # Plot FFT
-    x_fft, y_fft = sqil.compute_fft(x_data, proj)
-    x_peaks, y_peaks = sqil.get_peaks(x_fft, y_fft)
-    sqil.set_plot_style(plt)
+    x_fft, y_fft = compute_fft(x_data, proj)
+    x_peaks, y_peaks = get_peaks(x_fft, y_fft)
+    set_plot_style(plt)
     fig2, ax2 = plt.subplots(1, 1)
     ax2.plot(x_fft / 1e6, y_fft)
     ax2.scatter(

@@ -1,28 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import sqil_core as sqil
+import sqil_core.fit as fit
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
 from laboneq.dsl.quantum import QPU
 from laboneq.dsl.quantum.quantum_element import QuantumElement
-from laboneq.simple import (
-    Experiment,
-    SectionAlignment,
-    SweepParameter,
-    dsl,
-    pulse_library,
-)
+from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
 from laboneq.workflow import option_field, task_options
 from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import BaseExperimentOptions
-from matplotlib.gridspec import GridSpec
 from numpy.typing import ArrayLike
-from sqil_core.experiment import ExperimentHandler
+from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
+from sqil_core.utils import *
 
 
 @task_options(base_class=BaseExperimentOptions)
 class TimeRabiOptions:
-    """Options for the time Rabi experiment."""
-
     transition: str = option_field("ge", description="Transition to apply pulse.")
     acquisition_type: AcquisitionType = option_field(
         AcquisitionType.INTEGRATION, description="Acquisition type."
@@ -103,15 +95,9 @@ class TimeRabi(ExperimentHandler):
         )
 
     def analyze(self, path, *args, **kwargs):
-        # FIXME: passing qu_uid = qu_uid causes an error, unhashable type: 'numpy.ndarray'
         return analyze_time_rabi(path=path, **kwargs)
 
 
-from sqil_core.experiment import AnalysisResult, multi_qubit_handler
-from sqil_core.utils import *
-
-
-# TODO: ADD OPTION TO CALIBRATE ALSO FUCKING PI/2 PULSE
 @multi_qubit_handler
 def analyze_time_rabi(
     datadict,
@@ -136,21 +122,19 @@ def analyze_time_rabi(
         relevant_params = [f"{transition}_drive_amplitude_pi"]
 
     # Set plot style
-    sqil.set_plot_style(plt)
+    set_plot_style(plt)
 
     has_sweeps = y_data.ndim > 1
     if not has_sweeps:
         try:
             # Project the data and start plot
-            proj, inv = sqil.fit.transform_data(y_data, inv_transform=True)
+            proj, inv = fit.transform_data(y_data, inv_transform=True)
             fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj)
             anal_res.add_figure(fig, "fig", qu_id)
             # Analyze
-            fit_res_exp = sqil.fit.fit_decaying_oscillations(lengths, proj)
-            fit_res_const = sqil.fit.fit_oscillations(lengths, proj)
-            fit_res = sqil.fit.get_best_fit(
-                fit_res_exp, fit_res_const, recipe="nrmse_aic"
-            )
+            fit_res_exp = fit.fit_decaying_oscillations(lengths, proj)
+            fit_res_const = fit.fit_oscillations(lengths, proj)
+            fit_res = fit.get_best_fit(fit_res_exp, fit_res_const, recipe="nrmse_aic")
 
             anal_res.add_fit(fit_res_exp, "Decaying oscillations", qu_id)
             anal_res.add_fit(fit_res_const, "Constant oscillations", qu_id)
@@ -161,10 +145,6 @@ def analyze_time_rabi(
 
             x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
             inverse_fit = inv(fit_res.predict(x_fit))
-
-            # Make parameters pretty
-            omega_r = sqil.format_number(1 / fit_res.params_by_name["T"], unit="Hz")
-            t_pi = sqil.format_number(fit_res.metadata["pi_time"], unit="s")
 
             # Plot the fit
             axs[0].plot(
