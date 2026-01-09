@@ -69,18 +69,19 @@ To exit the virtual environment just use `exit`
 
 ### 0. Prepare a measurement folder
 - Create a folder where you'll store the measurement code and setup
-- Copy `examples/measure.ipynb` to the new folder
-- Copy `examples/config.yaml` to the new folder
-- In the new folder, create a sub folder named `setup`
-- Copy `examples/setup.py` to your new setup folder
+- Copy the contents of `get_started/` in your new folder
 
 ### 1. Setup
+Navigate to `./setup` and find the setup file that more closely resembles your
+usecase, or create a new one.  
+
 **Data storage**
 - Change `data_folder_name` to the name of your cooldown
 - If needed, update the database folder names `db_root` and `db_root_local`
 
 **QPU**
-- Make sure you're using the right qubit class
+- Choose the right number of qubits `n_qubits`
+- Make sure you're using the appropriate qubit class
 - Choose initial qubit parameters reasonably close to the expected ones (optional)
 
 **Zurich Instruments**
@@ -93,6 +94,7 @@ To exit the virtual environment just use `exit`
 
 ### 2. Config
 - Specify the relative path to the setup file you want to use in `config.yaml`
+- Choose the desired log level (amount of information printed during measurements)
 
 ### 3. Measure
 - Choose the sqil experiments poetry environment as your kernel for `measure.ipynb`
