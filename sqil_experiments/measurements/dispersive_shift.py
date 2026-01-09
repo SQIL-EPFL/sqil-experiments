@@ -71,7 +71,8 @@ def create_experiment(
             ):
                 qop.prepare_state.omit_section(qubit, state=opts.transition[0])
                 qop.measure(qubit, dsl.handles.result_handle(f"{qubit.uid}/data_g"))
-                qop.passive_reset(qubit)
+                # Small delay to let photons exit the cavity. Should be > 10 / kappa
+                qop.delay(qubit, 10e-6)
 
             with dsl.section(
                 name=f"state {opts.transition[1]}", alignment=SectionAlignment.RIGHT
