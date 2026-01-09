@@ -1,8 +1,7 @@
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
-
-# from rr_spec import create_experiment
 from laboneq.dsl.quantum import QPU
 from laboneq.dsl.quantum.quantum_element import QuantumElement
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
@@ -113,10 +112,35 @@ class DispersiveShift(ExperimentHandler):
         )
 
     def analyze(self, path, *args, **kwargs):
-        anal_res: AnalysisResult = AnalysisResult()
+        return analyze_dispersive_shift(path=path, **kwargs)
 
-        datadict = extract_h5_data(path, get_metadata=True)
 
+@multi_qubit_handler
+def analyze_dispersive_shift(
+    datadict,
+    qu_id="q0",
+    transition="ge",
+    qpu=None,
+    at_sweep_idx=None,
+    relevant_params=[],
+    **kwargs,
+) -> AnalysisResult:
+    # Prepare analysis result object
+    anal_res = AnalysisResult()
+
+    # Extract data and metadata
+    qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
+    x_data, y_data, sweeps = qu_data
+    x_info, y_info, sweep_info = qu_info
+
+    fit_res = None
+    qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
+
+    # Set plot style
+    set_plot_style(plt)
+
+    has_sweeps = y_data.ndim > 1
+    if not has_sweeps:
         schema_g = {**datadict["metadata"]["schema"]}
         schema_e = {**datadict["metadata"]["schema"]}
 
@@ -124,23 +148,82 @@ class DispersiveShift(ExperimentHandler):
         del schema_e["data_g"]
 
         datadict["metadata"]["schema"] = schema_g
-        anal_res_g = rr_spec_analysis(datadict=datadict, path=path, **kwargs)
+        anal_res_g = rr_spec_analysis(datadict=datadict, qpu=qpu, qu_id=qu_id)
 
         datadict["metadata"]["schema"] = schema_e
-        anal_res_e = rr_spec_analysis(datadict=datadict, path=path, **kwargs)
+        anal_res_e = rr_spec_analysis(datadict=datadict, qpu=qpu, qu_id=qu_id)
 
-        set_plot_style(plt)
-        # fig, ax = plt.subplots(1,1)
-        # ax.plot()
-
+        # Extract resonance frequencies
         fr_g = anal_res_g.updated_params.get("q0", {}).get(
             "readout_resonator_frequency", None
         )
         fr_e = anal_res_e.updated_params.get("q0", {}).get(
             "readout_resonator_frequency", None
         )
+        # Add fits to new result
+        for key, fit in anal_res_g.fits.items():
+            anal_res.add_fit(fit, f"g_{key}", qu_id)
+        for key, fit in anal_res_e.fits.items():
+            anal_res.add_fit(fit, f"e_{key}", qu_id)
 
+        # Compute chi
+        chi = np.nan
         if fr_g and fr_e:
-            print(fr_e - fr_g)
+            chi = fr_e - fr_g
+            anal_res.add_params({f"{transition}_chi_shift": chi}, qu_id)
 
-        return
+        # Plotting
+        # Grab all Line2D objects from ax1 and ax2
+        g_lines = anal_res_g.figures["q0_fig"].axes[1].get_lines()
+        e_lines = anal_res_e.figures["q0_fig"].axes[1].get_lines()
+        # Extract x and y labels
+        x_label = anal_res_g.figures["q0_fig"].axes[2].get_xlabel()
+        y_label = anal_res_g.figures["q0_fig"].axes[1].get_ylabel()
+        # Close figures
+        plt.close("all")
+
+        # Create new figure and add both lines
+        fig, ax = plt.subplots(1, 1)
+        anal_res.add_figure(fig, "fig", qu_id)
+        for lines, lab in zip([g_lines, e_lines], ["g", "e"]):
+            ax.plot(lines[0].get_xdata(), lines[0].get_ydata(), "o", label=lab)
+            ax.plot(lines[1].get_xdata(), lines[1].get_ydata(), color="tab:red")
+
+        # Draw two vertical lines
+        x1, x2 = fr_g * 1e-9, fr_e * 1e-9
+        ax.axvline(x=x1, color="tab:blue", linestyle="--")
+        ax.axvline(x=x2, color="tab:orange", linestyle="--")
+        # Draw the arrow with two heads (symbolizing distance between lines)
+        arrow = patches.FancyArrowPatch(
+            (x1, 0),  # Start point (x1, 0)
+            (x2, 0),  # End point (x2, 0)
+            arrowstyle="<|-|>",  # Arrow style with two heads
+            mutation_scale=20,  # Size of the arrows
+            color="black",
+            linewidth=2,
+        )
+        # Add the arrow to the plot
+        ax.add_patch(arrow)
+        # Add text above the arrow
+        midpoint_x = (x1 + x2) / 2  # Find the midpoint of the x-coordinates
+        ax.text(midpoint_x, 0.005, r"$\chi$", ha="center", va="bottom")
+
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+        ax.legend()
+    else:
+        fig, axs = plot_mag_phase(datadict=datadict, raw=True)
+        anal_res.add_figure(fig, "fig", qu_id)
+
+    finalize_plot(
+        fig,
+        f"Dispersive shift ({transition})",
+        qu_id,
+        fit_res,
+        qubit_params,
+        updated_params=anal_res.updated_params.get(qu_id, {}),
+        sweep_info=sweep_info,
+        relevant_params=relevant_params,
+    )
+
+    return anal_res
