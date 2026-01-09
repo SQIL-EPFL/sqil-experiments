@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from IPython.display import clear_output
-from qu_spec import QuSpec
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
-from time_rabi import TimeRabi
 
+from sqil_experiments.measurements.qu_spec import QuSpec
 from sqil_experiments.measurements.qubit_temperature import QubitTemperature
+from sqil_experiments.measurements.time_rabi import TimeRabi
 
 
 class QubitTemperatureAdaptive(ExperimentHandler):
@@ -116,8 +116,8 @@ class QubitTemperatureAdaptive(ExperimentHandler):
             options=qubit_temp_options,
         )
 
-        T = qubit_temp_res.result.get("q0", {}).get("T", np.nan)
-        T_std = qubit_temp_res.result.get("q0", {}).get("T_std", np.nan)
+        T = qubit_temp_res.output.get("q0", {}).get("T", np.nan)
+        T_std = qubit_temp_res.output.get("q0", {}).get("T_std", np.nan)
 
         # Remove figures from memory
         plt.close("all")
