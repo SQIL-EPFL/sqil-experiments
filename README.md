@@ -34,9 +34,10 @@ pip install poetry-plugin-shell
 pip install jupyter ipykernel
 ```
 
-**6. Install the required packages using poetry**
+**6. Install the required packages using poetry**  
+Go to the `sqil-experiments` folder and run the following command to create a virtual environment that contains all the dependencies needed.
 ```bash
-poetry install --no-root
+poetry install
 ```
 
 **7. Install the pre-commit hooks**
