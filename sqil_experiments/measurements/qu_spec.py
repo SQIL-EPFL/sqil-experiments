@@ -1,23 +1,5 @@
-# Copyright 2024 Zurich Instruments AG
-# SPDX-License-Identifier: Apache-2.0
-
-"""This module defines the qubit spectroscopy experiment.
-
-In this experiment, we sweep the frequency of a qubit drive pulse to characterize
-the qubit transition frequency.
-
-The qubit spectroscopy experiment has the following pulse sequence:
-
-    qb --- [ prep transition ] --- [ x180_transition (swept frequency)] --- [ measure ]
-
-If multiple qubits are passed to the `run` workflow, the above pulses are applied
-in parallel on all the qubits.
-"""
-
 import matplotlib.pyplot as plt
 import numpy as np
-import sqil_core as sqil
-from laboneq import workflow
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
 from laboneq.dsl.quantum.qpu import QPU
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
@@ -25,7 +7,10 @@ from laboneq.workflow import option_field, task_options
 from laboneq_applications.core.validation import validate_and_convert_qubits_sweeps
 from laboneq_applications.experiments.options import BaseExperimentOptions
 from laboneq_applications.typing import QuantumElements, QubitSweepPoints
-from sqil_core.experiment import ExperimentHandler
+from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
+from sqil_core.utils import *
+
+from sqil_experiments.analysis.fit import find_shared_peak
 
 
 @task_options(base_class=BaseExperimentOptions)
@@ -44,7 +29,6 @@ class QuSpecOptions:
     )
 
 
-# @workflow.task
 @dsl.qubit_experiment
 def create_experiment(
     qpu: QPU,
@@ -73,8 +57,8 @@ def create_experiment(
                 name=f"freqs_{q.uid}",
                 parameter=SweepParameter(f"frequency_{q.uid}", q_frequencies),
             ) as frequency:
-                qop.prepare_state.omit_section(q, state=transition[0])
                 with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
+                    qop.prepare_state.omit_section(q, state=transition[0])
                     qop.set_frequency(q, frequency, transition=transition)
                     qop.qubit_spectroscopy_drive(q, transition=transition)
                     sec = qop.measure(q, dsl.handles.result_handle(q.uid))
@@ -113,15 +97,6 @@ class QuSpec(ExperimentHandler):
         return qu_spec_analysis(path=path, **kwargs)
 
 
-from sqil_core.experiment import AnalysisResult, multi_qubit_handler
-from sqil_core.fit import FitQuality
-from sqil_core.utils import *
-
-from sqil_experiments.analysis.fit import find_shared_peak
-
-# map_data_dict, extract_h5_data, param_info_from_schema, enrich_qubit_params, get_relevant_exp_parameters, plot_mag_phase, ONE_TONE_PARAMS, ParamInfo
-
-
 @multi_qubit_handler
 def qu_spec_analysis(
     datadict,
@@ -144,7 +119,7 @@ def qu_spec_analysis(
     qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     # Set plot style
-    sqil.set_plot_style(plt)
+    set_plot_style(plt)
 
     has_sweeps = y_data.ndim > 1
     if not has_sweeps:

@@ -1,22 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import sqil_core as sqil
+import sqil_core.fit as fit
 from laboneq.dsl.enums import AcquisitionType, AveragingMode
 from laboneq.dsl.quantum import QPU
 from laboneq.dsl.quantum.quantum_element import QuantumElement
-from laboneq.simple import (
-    Experiment,
-    SectionAlignment,
-    SweepParameter,
-    dsl,
-    pulse_library,
-)
+from laboneq.simple import Experiment, SweepParameter, dsl
 from laboneq.workflow import option_field, task_options
 from laboneq_applications.core import validation
 from laboneq_applications.experiments.options import BaseExperimentOptions
-from matplotlib.gridspec import GridSpec
 from numpy.typing import ArrayLike
-from sqil_core.experiment import ExperimentHandler
+from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
+from sqil_core.utils import *
 
 
 @task_options(base_class=BaseExperimentOptions)
@@ -98,11 +92,6 @@ class QubitTemperature(ExperimentHandler):
         return analyze_qubit_temperature(path=path, **kwargs)
 
 
-from sqil_core.experiment import AnalysisResult, multi_qubit_handler
-from sqil_core.fit import FitResult
-from sqil_core.utils import *
-
-
 @multi_qubit_handler
 def analyze_qubit_temperature(
     datadict,
@@ -134,15 +123,15 @@ def analyze_qubit_temperature(
     qu_freq = qpu.quantum_elements[int(qu_id[1:])].parameters.resonance_frequency_ge
 
     # Set plot style
-    sqil.set_plot_style(plt)
+    set_plot_style(plt)
 
     has_sweeps = y_data.ndim > 1
     if not has_sweeps:
         try:
             # Extract and project the data
             amplitudes = datadict["amplitude"]
-            proj_no_pi = sqil.fit.transform_data(datadict["data_no_pi"])
-            proj_pi = sqil.fit.transform_data(datadict["data_pi"])
+            proj_no_pi = fit.transform_data(datadict["data_no_pi"])
+            proj_pi = fit.transform_data(datadict["data_pi"])
 
             # Plot
             fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj_no_pi)
@@ -175,8 +164,8 @@ def analyze_qubit_temperature(
         for i in range(len(idx)):
             # Extract and project the data
             amplitudes = datadict["amplitude"][i]
-            proj_no_pi = sqil.fit.transform_data(datadict["data_no_pi"][i])
-            proj_pi = sqil.fit.transform_data(datadict["data_pi"][i])
+            proj_no_pi = fit.transform_data(datadict["data_no_pi"][i])
+            proj_pi = fit.transform_data(datadict["data_pi"][i])
             T_qu_arr[i], P_e_arr[i] = compute_qubit_temp(proj_pi, proj_no_pi, qu_freq)
 
         T_qu_arr, P_e_arr = mask_outliers(T_qu_arr), mask_outliers(P_e_arr)

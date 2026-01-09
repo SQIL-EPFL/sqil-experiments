@@ -4,26 +4,17 @@ from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
-import sqil_core as sqil
-from laboneq.dsl.enums import AcquisitionType, AveragingMode
+import sqil_core.fit as fit
+from laboneq.dsl.enums import AveragingMode
 from laboneq.dsl.quantum import QPU
-from laboneq.dsl.quantum.quantum_element import QuantumElement
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
-from laboneq.workflow import option_field, task_options
 from laboneq_applications.core import validation
-from laboneq_applications.experiments.options import (
-    BaseExperimentOptions,
-    TuneupExperimentOptions,
-)
-from matplotlib.gridspec import GridSpec
-from numpy.typing import ArrayLike
+from laboneq_applications.experiments.options import TuneupExperimentOptions
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
 
 if TYPE_CHECKING:
-    from laboneq.dsl.quantum import TransmonParameters
     from laboneq.dsl.quantum.qpu import QPU
-    from laboneq.dsl.session import Session
     from laboneq_applications.typing import QuantumElements, QubitSweepPoints
 
 
@@ -34,68 +25,6 @@ def create_experiment(
     delays: QubitSweepPoints,
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
-    """Creates a lifetime_measurement Experiment.
-
-    Arguments:
-        qpu:
-            The qpu consisting of the original qubits and quantum operations.
-        qubits:
-            The qubits to run the experiments on. May be either a single
-            qubit or a list of qubits.
-        delays:
-            The delays to sweep over for each qubit. If `qubits` is a
-            single qubit, `amplitudes` must be a list of numbers or an array. Otherwise
-            it must be a list of lists of numbers or arrays.
-        options:
-            The options for building the experiment.
-            See [TuneupExperimentOptions] and [BaseExperimentOptions] for
-            accepted options.
-            Overwrites the options from [TuneupExperimentOptions] and
-            [BaseExperimentOptions].
-
-    Returns:
-        experiment:
-            The generated LabOne Q experiment instance to be compiled and executed.
-
-    Raises:
-        ValueError:
-            If the qubits and qubit_delays are not of the same length.
-
-        ValueError:
-            If qubit_delays is not a list of numbers when a single qubit is passed.
-
-        ValueError:
-            If qubit_delays is not a list of lists of numbers.
-
-        ValueError:
-            If the experiment uses calibration traces and the averaging mode is
-            sequential.
-
-    Example:
-        ```python
-        options = {
-            "count": 10,
-            "transition": "ge",
-            "averaging_mode": "cyclic",
-            "acquisition_type": "integration_trigger",
-            "cal_traces": True,
-        }
-        options = TuneupExperimentOptions(**options)
-        setup = DeviceSetup()
-        qpu = QPU(
-            setup=DeviceSetup("my_device"),
-            qubits=[TunableTransmonQubit("q0"), TunableTransmonQubit("q1")],
-            quantum_operations=TunableTransmonOperations(),
-        )
-        temp_qubits = qpu.copy_qubits()
-        create_experiment(
-            qpu=qpu,
-            qubits=temp_qubits,
-            delays=[[10e-9, 50e-9, 1], [10e-9, 50e-9, 1]],
-            options=options,
-        )
-        ```
-    """
     # Define the custom options for the experiment
     opts = TuneupExperimentOptions() if options is None else options
     qubits, delays = validation.validate_and_convert_qubits_sweeps(qubits, delays)
@@ -198,18 +127,16 @@ def analyze_T1(
         relevant_params = [f"{transition}_drive_amplitude_pi"]
 
     # Set plot style
-    sqil.set_plot_style(plt)
+    set_plot_style(plt)
 
     has_sweeps = y_data.ndim > 1
     if not has_sweeps:
         # Plot raw data and extract projection
-        fig, axs, proj, inv = sqil.plot_projection_IQ(
-            datadict=datadict, full_output=True
-        )
+        fig, axs, proj, inv = plot_projection_IQ(datadict=datadict, full_output=True)
         anal_res.add_figure(fig, "fig", qu_id)
 
         # Fit exponential
-        fit_res = sqil.fit.fit_decaying_exp(x_data, proj)
+        fit_res = fit.fit_decaying_exp(x_data, proj)
         x_fit = np.linspace(x_data[0], x_data[-1], 3 * len(x_data))
         inverse_fit = inv(fit_res.predict(x_fit))
         anal_res.add_fit(fit_res, "fit", qu_id)
@@ -235,8 +162,8 @@ def analyze_T1(
             fit_res = None
             x, y = x_data[i], y_data[i]
             try:
-                proj = sqil.fit.transform_data(y, inv_transform=False)
-                fit_res = sqil.fit.fit_decaying_exp(x, proj)
+                proj = fit.transform_data(y, inv_transform=False)
+                fit_res = fit.fit_decaying_exp(x, proj)
             except Exception as e:
                 print(f"Error ananlyzing trace {i}", e)
             if fit_res is not None:
