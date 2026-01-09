@@ -2,23 +2,10 @@ from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
-import sqil_core as sqil
-from laboneq.dsl.quantum import QPU
-from laboneq.dsl.quantum.quantum_element import QuantumElement
-from numpy.typing import ArrayLike
 from sqil_core.experiment import ExperimentHandler
 from sqil_core.experiment.instruments.vna import VNA
 
-from sqil_experiments.measurements.helpers.sqil_transmon.operations import (
-    SqilTransmonOperations,
-)
-from sqil_experiments.measurements.helpers.sqil_transmon.qubit import SqilTransmon
 from sqil_experiments.measurements.rr_spec import rr_spec_analysis
-
-# from sqil_experiments.measurements.helpers.Rohde_Schwarz_ZNA26 import RohdeSchwarzZNA26
-# from sqil_experiments.measurements.helpers.ZNB_taketo import RohdeSchwarzZNBChannel
-
-VNA_IP = r"TCPIP0::192.168.1.203::inst0::INSTR"
 
 
 class CW_RRSpec(ExperimentHandler):
