@@ -330,18 +330,7 @@ def analyze_qubit_temperature_custom(
             proj_no_pi = fit.transform_data(datadict["data_no_pi"][i])
             proj_pi = fit.transform_data(datadict["data_pi"][i])
             T_qu_arr[i], P_e_arr[i], fits = compute_qubit_temp_amplitude_fitted(
-                amplitudes,
-                proj_pi,
-                proj_no_pi,
-                qu_freq,
-                anchor_amplitude_period=(amplitudes[-1] - amplitudes[0])
-                / (
-                    2
-                    * qpu.quantum_elements[
-                        int(qu_id[1:])
-                    ].parameters.ef_drive_amplitude_pi
-                ),
-                anchor_phi=0,
+                amplitudes, proj_pi, proj_no_pi, qu_freq, fit_kwargs=fit_kwargs
             )
 
         T_qu_arr, P_e_arr = mask_outliers(T_qu_arr), mask_outliers(P_e_arr)
@@ -393,6 +382,6 @@ def compute_qubit_temp_amplitude_fitted(
     T_qu = h * qu_freq / (kb * np.log(1 / P_e - 1))
 
     if T_qu < 0:
-        return np.nan, np.nan
+        return np.nan, np.nan, np.nan
 
     return T_qu, P_e, (fit_res_no_pi, fit_res_pi)
