@@ -217,28 +217,39 @@ def analyze_interleaved_T1_echo(
             anal_res.add_fit(fit_res_echo, f"{i} - echo", qu_id)
             T2s[i] = fit_res_echo.params_by_name["tau"]
 
-        T1s_masked = np.where(T1s > 0, T1s, np.nan)
-        T1s_masked = mask_outliers(T1s_masked)
-        T2s_masked = np.where(T2s > 0, T2s, np.nan)
-        T2s_masked = mask_outliers(T2s_masked)
+    T1s_valid = np.where(T1s > 0, T1s, np.nan)
+    T1s_masked = mask_outliers(T1s_valid)
+    T2s_valid = np.where(T2s > 0, T2s, np.nan)
+    T2s_masked = mask_outliers(T2s_valid)
 
-        # Update parameters
-        T1, T2 = np.nanmean(T1s_masked), np.mean(T2s_masked)
-        anal_res.add_params(
-            {
-                f"{transition}_T1": T1,
-                f"{transition}_T2": T2,
-            },
-            qu_id,
-        )
-        if transition == "ge":
-            anal_res.add_params({"reset_delay_length": 5.01 * T1}, qu_id)
+    T1s_mask_inv = np.isnan(T1s_masked) & ~np.isnan(T1s_valid)
+    T1s_outliers = np.full_like(T1s_valid, np.nan)
+    T1s_outliers[T1s_mask_inv] = T1s_valid[T1s_mask_inv]
+
+    T2s_mask_inv = np.isnan(T2s_masked) & ~np.isnan(T2s_valid)
+    T2s_outliers = np.full_like(T2s_valid, np.nan)
+    T2s_outliers[T2s_mask_inv] = T2s_valid[T2s_mask_inv]
+
+    # Update parameters
+    T1, T2 = np.nanmean(T1s_masked), np.nanmean(T2s_masked)
+
+    anal_res.add_params(
+        {
+            f"{transition}_T1": T1,
+            f"{transition}_T2": T2,
+        },
+        qu_id,
+    )
+    if transition == "ge":
+        anal_res.add_params({"reset_delay_length": 5.01 * T1}, qu_id)
 
     # Plot
     T1_info = ParamInfo(f"{transition}_T1")
     echo_info = ParamInfo(f"{transition}_T2")
     T1_scaled = T1s_masked * T1_info.scale
     echo_scaled = T2s_masked * echo_info.scale
+    T1_outliers_scaled = T1s_outliers * T1_info.scale
+    echo_outliers_scaled = T2s_outliers * echo_info.scale
 
     if len(proj_T1) == 1:
         sweeps = np.array([[1]])
@@ -249,10 +260,12 @@ def analyze_interleaved_T1_echo(
     anal_res.add_figure(fig, "fig", qu_id)
 
     axs[0].plot(sweep_scaled, T1_scaled, ".-")
+    axs[0].plot(sweep_scaled, T1_outliers_scaled, ".-", color="red", alpha=0.5)
     axs[0].axhline(y=T1 * T1_info.scale, color="tab:pink", linestyle="--")
     axs[0].set_ylabel(T1_info.name_and_unit)
 
     axs[1].plot(sweep_scaled, echo_scaled, ".-")
+    axs[1].plot(sweep_scaled, echo_outliers_scaled, ".-", color="red", alpha=0.5)
     axs[1].axhline(y=T2 * echo_info.scale, color="tab:pink", linestyle="--")
     axs[1].set_ylabel(echo_info.name_and_unit)
 
