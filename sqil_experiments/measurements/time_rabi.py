@@ -131,9 +131,11 @@ def analyze_time_rabi(
             proj, inv = fit.transform_data(y_data, inv_transform=True)
             fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj)
             anal_res.add_figure(fig, "fig", qu_id)
+
             # Analyze
             fit_res_exp = fit.fit_decaying_oscillations(lengths, proj)
             fit_res_const = fit.fit_oscillations(lengths, proj)
+
             fit_res = fit.get_best_fit(fit_res_exp, fit_res_const, recipe="nrmse_aic")
 
             anal_res.add_fit(fit_res_exp, "Decaying oscillations", qu_id)
@@ -143,12 +145,207 @@ def analyze_time_rabi(
                 {f"{transition}_drive_length": fit_res.metadata["pi_time"]}, qu_id
             )
 
-            x_fit = np.linspace(lengths[0], lengths[-1], 3 * len(lengths))
+            x_fit = np.linspace(lengths[0], lengths[-1], 10 * len(lengths))
             inverse_fit = inv(fit_res.predict(x_fit))
 
             # Plot the fit
             axs[0].plot(
-                x_fit * x_info.scale, fit_res.predict(x_fit) * y_info.scale, "tab:red"
+                x_fit * x_info.scale,
+                fit_res.predict(x_fit) * y_info.scale,
+                "tab:red",
+                alpha=0.8,
+                linewidth=2,
+            )
+            axs[1].plot(
+                inverse_fit.real * y_info.scale,
+                inverse_fit.imag * y_info.scale,
+                "tab:red",
+            )
+        except Exception as e:
+            print("Error while fitting projected data", e)
+
+    elif has_sweeps:
+        fig, axs = plot_mag_phase(datadict=datadict, raw=True)
+        anal_res.add_figure(fig, "fig", qu_id)
+
+    finalize_plot(
+        fig,
+        f"Time Rabi ({transition})",
+        qu_id,
+        fit_res,
+        qubit_params,
+        anal_res.updated_params.get(qu_id, {}),
+        sweep_info=sweep_info,
+        relevant_params=relevant_params,
+    )
+
+    return anal_res
+
+
+@multi_qubit_handler
+def analyze_time_rabi_decay(
+    datadict,
+    qpu=None,
+    qu_id="q0",
+    transition="ge",
+    relevant_params=None,
+    fit_kwargs=None,
+    **kwargs,
+):
+    # Prepare analysis result object
+    anal_res = AnalysisResult()
+
+    if fit_kwargs is None:
+        fit_kwargs = {}
+
+    # Extract data and metadata
+    qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
+    lengths, y_data, sweeps = qu_data
+    x_info, y_info, sweep_info = qu_info
+
+    fit_res, fig = None, None
+    qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
+
+    if relevant_params is None:
+        relevant_params = [f"{transition}_drive_amplitude_pi"]
+
+    # Set plot style
+    set_plot_style(plt)
+
+    has_sweeps = y_data.ndim > 1
+    if not has_sweeps:
+        try:
+            # Project the data and start plot
+            proj, inv = fit.transform_data(y_data, inv_transform=True)
+            fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj)
+            anal_res.add_figure(fig, "fig", qu_id)
+
+            # Analyze
+            fit_res = fit.fit_decaying_oscillations(lengths, proj, **fit_kwargs)
+
+            anal_res.add_fit(fit_res, "Decaying oscillations", qu_id)
+            # Update parameters
+            anal_res.add_params(
+                {f"{transition}_drive_length": fit_res.metadata["pi_time"]},
+                qu_id,
+            )
+            anal_res.add_params(
+                {f"decay": fit_res.params_by_name["tau"]},
+                qu_id,
+            )
+
+            x_fit = np.linspace(lengths[0], lengths[-1], 10 * len(lengths))
+            inverse_fit = inv(fit_res.predict(x_fit))
+
+            # Plot the fit
+            axs[0].plot(
+                x_fit * x_info.scale,
+                fit_res.predict(x_fit) * y_info.scale,
+                "tab:red",
+                alpha=0.8,
+                linewidth=2,
+            )
+            axs[1].plot(
+                inverse_fit.real * y_info.scale,
+                inverse_fit.imag * y_info.scale,
+                "tab:red",
+            )
+        except Exception as e:
+            print("Error while fitting projected data", e)
+
+    elif has_sweeps:
+        fig, axs = plot_mag_phase(datadict=datadict, raw=True)
+        anal_res.add_figure(fig, "fig", qu_id)
+
+    finalize_plot(
+        fig,
+        f"Time Rabi ({transition})",
+        qu_id,
+        fit_res,
+        qubit_params,
+        anal_res.updated_params.get(qu_id, {}),
+        sweep_info=sweep_info,
+        relevant_params=relevant_params,
+    )
+
+    return anal_res
+
+    ######
+
+
+@multi_qubit_handler
+def analyze_time_rabi_decay_bi_exponential(
+    datadict,
+    qpu=None,
+    qu_id="q0",
+    transition="ge",
+    relevant_params=None,
+    fit_kwargs=None,
+    **kwargs,
+):
+    # Prepare analysis result object
+    anal_res = AnalysisResult()
+
+    # Extract data and metadata
+    qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
+    lengths, y_data, sweeps = qu_data
+    x_info, y_info, sweep_info = qu_info
+
+    fit_res, fig = None, None
+    qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
+
+    if relevant_params is None:
+        relevant_params = [f"{transition}_drive_amplitude_pi"]
+
+    # Set plot style
+    set_plot_style(plt)
+
+    from sqil_experiments.analysis.fit_dev import (
+        fit_decaying_oscillations_biexponential,
+    )
+
+    has_sweeps = y_data.ndim > 1
+    if not has_sweeps:
+
+        proj, inv = fit.transform_data(y_data, inv_transform=True)
+        fit_res = fit_decaying_oscillations_biexponential(lengths, proj, **fit_kwargs)
+
+        try:
+            # Project the data and start plot
+            proj, inv = fit.transform_data(y_data, inv_transform=True)
+            fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj)
+            anal_res.add_figure(fig, "fig", qu_id)
+
+            # Analyze
+            fit_res = fit_decaying_oscillations_biexponential(
+                lengths, proj, **fit_kwargs
+            )
+
+            anal_res.add_fit(fit_res, "Decaying oscillations", qu_id)
+            # Update parameters
+            anal_res.add_params(
+                {f"{transition}_drive_length": fit_res.metadata["pi_time"]},
+                qu_id,
+            )
+            anal_res.add_params(
+                {f"decay_a": fit_res.params_by_name["Ta"]},
+                qu_id,
+            )
+            anal_res.add_params(
+                {f"decay_b": fit_res.params_by_name["Tb"]},
+                qu_id,
+            )
+
+            x_fit = np.linspace(lengths[0], lengths[-1], 10 * len(lengths))
+            inverse_fit = inv(fit_res.predict(x_fit))
+
+            # Plot the fit
+            axs[0].plot(
+                x_fit * x_info.scale,
+                fit_res.predict(x_fit) * y_info.scale,
+                "tab:red",
+                alpha=0.8,
+                linewidth=2,
             )
             axs[1].plot(
                 inverse_fit.real * y_info.scale,
