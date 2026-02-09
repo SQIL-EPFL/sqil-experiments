@@ -155,6 +155,16 @@ class SqilTransmonParameters(QuantumParameters):
         factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
     )
 
+    # Helper drive parameters (bound to drive_lo_frequency)
+
+    helper_drive_frequency: float | None = None
+    helper_drive_amplitude_pi: float = 0.8
+    helper_drive_amplitude_pi2: float = 0.4
+    helper_drive_length: float = 50e-9
+    helper_drive_pulse: dict = attrs.field(
+        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
+    )
+
     # aux pulse parameters
 
     aux_frequency: float | None = None
@@ -241,6 +251,13 @@ class SqilTransmonParameters(QuantumParameters):
         return self.resonance_frequency_ef - self.drive_lo_frequency
 
     @property
+    def drive_frequency_helper(self) -> float | None:
+        """Qubit drive frequency for the helper transition."""
+        if self.drive_lo_frequency is None or self.helper_drive_frequency is None:
+            return None
+        return self.helper_drive_frequency - self.drive_lo_frequency
+
+    @property
     def drive_frequency_aux(self) -> float | None:
         if self.aux_lo_frequency is None or self.aux_frequency is None:
             return None
@@ -278,9 +295,9 @@ class SqilTransmon(QuantumElement):
         "drive",
         "measure",
     )
-    OPTIONAL_SIGNALS = ("drive_ef", "aux", "flux", "hdawg")
+    OPTIONAL_SIGNALS = ("drive_ef", "drive_helper", "aux", "flux", "hdawg")
 
-    TRANSITIONS = ("ge", "ef", "aux", "hdawg")
+    TRANSITIONS = ("ge", "ef", "helper", "aux", "hdawg")
 
     def transition_parameters(self, transition: str | None = None) -> tuple[str, dict]:
         """Return the transition drive signal line and parameters.
@@ -314,7 +331,12 @@ class SqilTransmon(QuantumElement):
             line = "hdawg"
             param_keys = ["amplitude_pi", "amplitude_pi2", "length", "pulse"]
         else:
-            line = "drive" if transition == "ge" else "drive_ef"
+            if transition == "ge":
+                line = "drive"
+            elif transition == "ef":
+                line = "drive_ef"
+            elif transition == "helper":
+                line = "drive_helper"
             param_keys = ["amplitude_pi", "amplitude_pi2", "length", "pulse"]
 
         params = {
@@ -515,6 +537,17 @@ class SqilTransmon(QuantumElement):
             sig_cal.local_oscillator = drive_lo
             sig_cal.range = self.parameters.drive_range
             calibration_items[self.signals["drive_ef"]] = sig_cal
+        if "drive_helper" in self.signals:
+            sig_cal = SignalCalibration()
+            if self.parameters.drive_frequency_helper is not None:
+                sig_cal.oscillator = Oscillator(
+                    uid=f"{self.uid}_drive_helper_osc",
+                    frequency=self.parameters.drive_frequency_helper,
+                    modulation_type=ModulationType.AUTO,
+                )
+            sig_cal.local_oscillator = drive_lo
+            sig_cal.range = self.parameters.drive_range
+            calibration_items[self.signals["drive_helper"]] = sig_cal
         if "aux" in self.signals:
             sig_cal = SignalCalibration()
             if self.parameters.drive_frequency_aux is not None:
