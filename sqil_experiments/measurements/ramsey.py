@@ -119,6 +119,7 @@ class Ramsey(ExperimentHandler):
     db_schema = {
         "data": {"role": "data", "unit": "V", "scale": 1e3},
         "time": {"role": "x-axis", "unit": "s", "scale": 1e6},
+        # "detuning": {"role": "param", "unit": "Hz", "scale": 1e-6}, is this scale correct for Hz?
     }
 
     def sequence(self, time, detuning, qu_ids=["q0"], options=None, *args, **kwargs):
@@ -156,6 +157,8 @@ def analyze_ramsey(
         fig, axs, proj, inv = plot_projection_IQ(datadict=datadict, full_output=True)
         anal_res.add_figure(fig, "fig", qu_id)
 
+        init_freq = 1e3
+
         # Try to fit the sum of 1, 2 and 3 decaying oscillations and see which one fits best
         best_fit = None
         n_oscillation = [1, 2, 3]
@@ -165,11 +168,27 @@ def analyze_ramsey(
             except:
                 fit_res = None
             if fit_res is not None:
+                if n == 1:
+                    init_freq = fit_res.params_by_name["T0"]
                 anal_res.add_fit(fit_res, f"{n} oscillations", qu_id)
                 if best_fit is None:
                     best_fit = fit_res
                     continue
                 best_fit = fit.get_best_fit(best_fit, fit_res, recipe="nrmse_aic")
+
+        # Low frequency second mode
+        try:
+            guess = 9 * [None]
+            guess[3] = 0.99 * init_freq  # 1e3
+            guess[7] = 1.01 * init_freq  # 1e3
+            fit_res = fit.fit_many_decaying_oscillations(x_data, proj, 2, guess)
+        except:
+            fit_res = None
+
+        if fit_res is not None:
+            anal_res.add_fit(fit_res, f"2 oscillations guess", qu_id)
+            best_fit = fit.get_best_fit(best_fit, fit_res, recipe="nrmse_aic")
+            best_fit.summary()
 
         if best_fit is not None:
             fit_res = best_fit
