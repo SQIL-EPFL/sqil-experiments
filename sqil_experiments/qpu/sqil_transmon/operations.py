@@ -419,6 +419,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         transition: str | None = None,
         amplitude: float | SweepParameter | None = None,
         phase: float = 0.0,
+        increment_oscillator_phase: float | SweepParameter | None = None,
         length: float | SweepParameter | None = None,
         pulse: dict | None = None,
     ) -> None:
@@ -439,6 +440,9 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             phase:
                 The phase of the rotation pulse in radians. By default
                 this is 0.0.
+            increment_oscillator_phase:
+                The phase of the rotation pulse in radians applied as phase
+                increment on the baseband oscillator. By default this is 0.0.
             length:
                 The duration of the rotation pulse. By default this
                 is determined by the qubit parameters.
@@ -473,6 +477,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             q.signals[drive_line],
             amplitude=amplitude,
             phase=phase,
+            increment_oscillator_phase=increment_oscillator_phase,
             length=length,
             pulse=rx_pulse,
         )
@@ -595,6 +600,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         transition: str | None = None,
         amplitude: float | SweepParameter | None = None,
         phase: float = _PI_BY_2,
+        increment_oscillator_phase: float | SweepParameter | None = None,
         length: float | SweepParameter | None = None,
         pulse: dict | None = None,
     ) -> None:
@@ -613,8 +619,11 @@ class SqilTransmonOperations(dsl.QuantumOperations):
                 is determined by the angle and the π pulse amplitude
                 qubit parameter "amplitude_pi" by linear interpolation.
             phase:
-                The phase of the rotation pulse in radians. By default
-                this is `π / 2`.
+                The phase of the rotation pulse in radians, applied as a
+                baseband rotation of the waveform. By default this is `π / 2`.
+            increment_oscillator_phase:
+                The phase of the rotation pulse in radians applied as phase
+                increment on the baseband oscillator. By default this is 0.0.
             length:
                 The duration of the rotation pulse. By default this
                 is determined by the qubit parameters.
@@ -649,6 +658,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             q.signals[drive_line],
             amplitude=amplitude,
             phase=phase,
+            increment_oscillator_phase=increment_oscillator_phase,
             length=length,
             pulse=ry_pulse,
         )
@@ -1212,3 +1222,61 @@ def x180_ef_reset_pulse(
     time = 0.5 * (x + 1) * length
     wfm = dsl.pulse_library.pulse_factory(pulse_func)(**pls_kwags).evaluate(x)
     return np.exp(-1j * 2 * np.pi * frequency * time) * wfm
+
+
+@dsl.quantum_operation(broadcast=False)
+def spin_echo(
+    self,
+    q: SqilTransmon,
+    delay: float,
+    phase: float,
+    transition: str | None = None,
+) -> None:
+    """Performs a spin echo operation on a qubit.
+
+    This operation consists of the following steps:
+    x90 - rabi drive  - x90
+
+    Arguments:
+        q:
+            The qubit to rotate
+        delay:
+            The duration of the rabi drive.
+        phase:
+            The phase of the second rotation
+        transition:
+            The transition to rotate. By default this is "ge"
+            (i.e. the 0-1 transition).
+
+    Raise:
+        ValueError:
+            If the transition is not "ge" nor "ef".
+
+        ValueError:
+            If the echo pulse is not None and not x180 or y180.
+    """
+    transition = "ge" if transition is None else transition
+    if transition == "ef":
+        on_system_grid = True
+    elif transition == "ge":
+        on_system_grid = False
+    elif transition == "hdawg":
+        on_system_grid = False
+    else:
+        raise ValueError(f"Support only ge or ef transitions, not {transition!r}")
+
+    with dsl.section(
+        name=f"spin_echo_{q.uid}",
+        on_system_grid=on_system_grid,
+        alignment=SectionAlignment.RIGHT,
+    ):
+        sec_x90_1 = self.x90(q, transition=transition)
+        sec_x90_1.alignment = SectionAlignment.RIGHT
+
+        self.x180(q, length=delay, transition=transition)
+
+        sec_x90_2 = self.x90(q, phase=phase, transition=transition)
+        sec_x90_2.alignment = SectionAlignment.RIGHT
+
+    sec_x90_1.on_system_grid = False
+    sec_x90_2.on_system_grid = False
