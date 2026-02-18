@@ -180,3 +180,7 @@ data
 
 # Config file
 sqil_experiments/measurements/config.yaml
+
+# Project folders
+**/_dev
+**/_stormcrow
