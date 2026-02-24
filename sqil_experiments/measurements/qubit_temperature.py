@@ -102,131 +102,6 @@ def analyze_qubit_temperature(
     transition="ge",
     relevant_params=None,
     qu_freq=None,
-    **kwargs,
-):
-    # Prepare analysis result object
-    anal_res = AnalysisResult()
-
-    # Extract data and metadata
-    qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
-    lengths, y_data, sweeps = qu_data
-    x_info, y_info, sweep_info = qu_info
-
-    # A_no_ge = np.mean(proj_no_pi)
-
-    fit_res, fig = None, None
-    qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
-
-    if relevant_params is None:
-        relevant_params = [f"ef_drive_amplitude_pi"]
-
-    # TODO: define datas here - maybe make a fake datadict
-    T_qu = np.nan
-    qu_freq = qpu.quantum_elements[int(qu_id[1:])].parameters.resonance_frequency_ge
-
-    # Set plot style
-    set_plot_style(plt)
-
-    has_sweeps = y_data.ndim > 1
-    if not has_sweeps:
-        try:
-            # Extract and project the data
-            amplitudes = datadict["amplitude"]
-            proj_no_pi = fit.transform_data(datadict["data_no_pi"])
-            proj_pi = fit.transform_data(datadict["data_pi"])
-
-            # Plot
-            fig, axs = plot_projection_IQ(datadict=datadict, proj_data=proj_no_pi)
-            anal_res.add_figure(fig, "fig", qu_id)
-            # Add pi data to plot
-            axs[0].plot(
-                amplitudes * x_info.scale,
-                proj_pi * y_info.scale,
-                "o",
-                color="tab:orange",
-            )
-            axs[1].plot(
-                np.real(datadict["data_pi"]) * y_info.scale,
-                np.imag(datadict["data_pi"]) * y_info.scale,
-                "o",
-                color="tab:orange",
-            )
-            axs[0].legend([r"without $\pi$-pulse", r"with $\pi$-pulse"])
-
-            T_qu, P_e = compute_qubit_temp(proj_pi, proj_no_pi, qu_freq)
-
-            anal_res.add_output({"T": T_qu, "P_e": P_e}, qu_id)
-
-        except Exception as e:
-            print("Error while fitting projected data", e)
-
-    elif sweep_info[0].id == "index":
-        idx = sweeps[0]
-        T_qu_arr, P_e_arr = np.ones(len(sweeps[0])), np.ones(len(sweeps[0]))
-        for i in range(len(idx)):
-            # Extract and project the data
-            amplitudes = datadict["amplitude"][i]
-            proj_no_pi = fit.transform_data(datadict["data_no_pi"][i])
-            proj_pi = fit.transform_data(datadict["data_pi"][i])
-            T_qu_arr[i], P_e_arr[i] = compute_qubit_temp(proj_pi, proj_no_pi, qu_freq)
-
-        T_qu_arr, P_e_arr = mask_outliers(T_qu_arr), mask_outliers(P_e_arr)
-        T_qu, T_qu_std = np.nanmean(T_qu_arr), np.nanstd(T_qu_arr)
-        P_e, P_e_std = np.nanmean(P_e_arr), np.nanstd(P_e_arr)
-        anal_res.add_output(
-            {"T": T_qu, "T_std": T_qu_std, "P_e": P_e, "P_e_std": P_e_std}, qu_id
-        )
-
-        fig, ax = plt.subplots(1, 1)
-        anal_res.add_figure(fig, "fig", qu_id)
-        ax.plot(sweeps[0] * sweep_info[0].scale, T_qu_arr * 1e3, "o")
-        ax.set_xlabel(sweep_info[0].name_and_unit)
-        ax.set_ylabel("Temperature [mK]")
-    else:
-        fig, axs = plot_mag_phase(datadict=datadict, raw=True)
-        anal_res.add_figure(fig, "fig", qu_id)
-
-    finalize_plot(
-        fig,
-        f"Qubit temperature {T_qu*1e3:.1f} mK - $P_e$ = {P_e*100:.2f} %",
-        qu_id,
-        fit_res,
-        qubit_params,
-        anal_res.updated_params.get(qu_id, {}),
-        sweep_info=sweep_info,
-        relevant_params=relevant_params,
-    )
-
-    return anal_res
-
-
-def compute_qubit_temp(proj_pi, proj_no_pi, qu_freq):
-    h = 6.6e-34
-    kb = 1.38e-23
-
-    P_e_array = 1 - np.abs(proj_pi) / (np.abs(proj_pi) + np.abs(proj_no_pi))
-    T_qu_array = h * qu_freq / (kb * np.log(1 / P_e_array - 1))
-
-    P_e = np.nanmean([P_e_array[0], P_e_array[1]])
-    T_qu = np.nanmean([T_qu_array[0], T_qu_array[1]])
-
-    if T_qu < 0:
-        return np.nan, np.nan
-
-    return T_qu, P_e
-
-
-###################
-
-
-@multi_qubit_handler
-def analyze_qubit_temperature_custom(
-    datadict,
-    qpu=None,
-    qu_id="q0",
-    transition="ge",
-    relevant_params=None,
-    qu_freq=None,
     fit_kwargs=None,
     **kwargs,
 ):
@@ -238,7 +113,7 @@ def analyze_qubit_temperature_custom(
 
     # Extract data and metadata
     qu_data, qu_info, datadict = get_data_and_info(datadict=datadict)
-    lengths, y_data, sweeps = qu_data
+    amplitudes, _, sweeps = qu_data
     x_info, y_info, sweep_info = qu_info
 
     fit_res, fig = None, None
@@ -248,17 +123,23 @@ def analyze_qubit_temperature_custom(
         relevant_params = [f"ef_drive_amplitude_pi"]
 
     # TODO: define datas here - maybe make a fake datadict
-    T_qu = np.nan
-    qu_freq = qpu.quantum_elements[int(qu_id[1:])].parameters.resonance_frequency_ge
+    P_e = np.nan
+    T_qu, T_qu_std = np.nan, np.nan
+    qu_freq = getattr(
+        qpu[qu_id].parameters, f"resonance_frequency_{transition}", np.nan
+    )
 
     # Set plot style
     set_plot_style(plt)
 
-    has_sweeps = y_data.ndim > 1
+    has_sweeps = (len(sweeps)) > 0
     if not has_sweeps:
+        # Prepare plot
+        fig, axs = make_plot_frame(plot_type="IQ")
+        anal_res.add_figure(fig, "fig", qu_id)
+
         try:
             # Extract and project the data
-            amplitudes = datadict["amplitude"]
             proj_no_pi, inv_no_pi = fit.transform_data(
                 datadict["data_no_pi"], inv_transform=True
             )
@@ -266,62 +147,58 @@ def analyze_qubit_temperature_custom(
                 datadict["data_pi"], inv_transform=True
             )
 
-            # Plot
-            fig, axs = plot_projection_IQ(datadict=datadict)
-            anal_res.add_figure(fig, "fig", qu_id)
             # Add pi data to plot
-            axs[0].plot(
-                amplitudes * x_info.scale,
-                proj_no_pi * y_info.scale,
-                "o",
-                color="tab:orange",
-            )
+            for proj, key in zip([proj_no_pi, proj_pi], ["data_no_pi", "data_pi"]):
+                axs[0].plot(
+                    amplitudes * x_info.scale,
+                    proj * y_info.scale,
+                    "o",
+                    label=key.replace("_", " "),
+                )
 
-            axs[1].plot(
-                np.real(datadict["data_no_pi"]) * y_info.scale,
-                np.imag(datadict["data_no_pi"]) * y_info.scale,
-                "o",
-                color="tab:orange",
-            )
-            axs[0].legend([r"without $\pi$-pulse", r"with $\pi$-pulse"])
+                axs[1].plot(
+                    np.real(datadict[key]) * y_info.scale,
+                    np.imag(datadict[key]) * y_info.scale,
+                    "o",
+                )
+            axs[0].legend()
 
-            T_qu, P_e, fits = compute_qubit_temp_amplitude_fitted(
-                amplitudes, proj_pi, proj_no_pi, qu_freq, fit_kwargs=fit_kwargs
-            )
-            fit_res_no_pi, fit_res_pi = fits
+        except Exception as e:
+            print("Error while extracting or projecting data", e)
 
-            # TODO: plot fits
-            x_fit = np.linspace(amplitudes[0], amplitudes[-1], 200)
-            inv_fit_no_pi = inv_no_pi(fit_res_no_pi.predict(x_fit))
-            axs[0].plot(
-                x_fit * x_info.scale,
-                fit_res_no_pi.predict(x_fit) * y_info.scale,
-                "tab:red",
-            )
-            axs[1].plot(
-                inv_fit_no_pi.real * y_info.scale,
-                inv_fit_no_pi.imag * y_info.scale,
-                "tab:red",
-            )
-            x_fit = np.linspace(amplitudes[0], amplitudes[-1], 200)
-            inv_fit_pi = inv_pi(fit_res_pi.predict(x_fit))
-            axs[0].plot(
-                x_fit * x_info.scale,
-                fit_res_pi.predict(x_fit) * y_info.scale,
-                "tab:red",
-            )
-            axs[1].plot(
-                inv_fit_pi.real * y_info.scale,
-                inv_fit_pi.imag * y_info.scale,
-                "tab:red",
-            )
+        try:
+            T_qu, T_qu_std, P_e, P_e_std = np.nan, np.nan, np.nan, np.nan
+            fits = None
+            if len(amplitudes) == 2:
+                T_qu, P_e, fits = compute_qubit_temp_amp_two_points(
+                    proj_pi, proj_no_pi, qu_freq, fit_kwargs=fit_kwargs
+                )
+            else:
+                (T_qu, T_qu_std), (P_e, P_e_std), fits = (
+                    compute_qubit_temp_amplitude_fitted(
+                        amplitudes, proj_pi, proj_no_pi, qu_freq, fit_kwargs=fit_kwargs
+                    )
+                )
+                x_fit = np.linspace(amplitudes[0], amplitudes[-1], 200)
+                for fit_res, inv in zip(fits, (inv_no_pi, inv_pi)):
+                    inv_fit = inv(fit_res.predict(x_fit))
+                    axs[0].plot(
+                        x_fit * x_info.scale,
+                        fit_res.predict(x_fit) * y_info.scale,
+                        "tab:red",
+                    )
+                    axs[1].plot(
+                        inv_fit.real * y_info.scale,
+                        inv_fit.imag * y_info.scale,
+                        "tab:red",
+                    )
 
             anal_res.add_output({"T": T_qu, "P_e": P_e}, qu_id)
 
         except Exception as e:
-            print("Error while fitting projected data", e)
+            print("Error extracting temperature from data", e)
 
-    elif sweep_info[0].id == "index":
+    else:
         idx = sweeps[0]
         T_qu_arr, P_e_arr = np.ones(len(sweeps[0])), np.ones(len(sweeps[0]))
         for i in range(len(idx)):
@@ -329,9 +206,16 @@ def analyze_qubit_temperature_custom(
             amplitudes = datadict["amplitude"][i]
             proj_no_pi = fit.transform_data(datadict["data_no_pi"][i])
             proj_pi = fit.transform_data(datadict["data_pi"][i])
-            T_qu_arr[i], P_e_arr[i], fits = compute_qubit_temp_amplitude_fitted(
-                amplitudes, proj_pi, proj_no_pi, qu_freq, fit_kwargs=fit_kwargs
-            )
+
+            if len(amplitudes) == 2:
+                T_qu, P_e, fits = compute_qubit_temp_amp_two_points(
+                    proj_pi, proj_no_pi, qu_freq, fit_kwargs=fit_kwargs
+                )
+            else:
+                (T_qu, _), (P_e, _), fits = compute_qubit_temp_amplitude_fitted(
+                    amplitudes, proj_pi, proj_no_pi, qu_freq, fit_kwargs=fit_kwargs
+                )
+            T_qu_arr[i], P_e_arr[i] = T_qu, P_e
 
         T_qu_arr, P_e_arr = mask_outliers(T_qu_arr), mask_outliers(P_e_arr)
         T_qu, T_qu_std = np.nanmean(T_qu_arr), np.nanstd(T_qu_arr)
@@ -340,18 +224,53 @@ def analyze_qubit_temperature_custom(
             {"T": T_qu, "T_std": T_qu_std, "P_e": P_e, "P_e_std": P_e_std}, qu_id
         )
 
+        perc10, perc90 = np.nanpercentile(T_qu_arr, [10, 90])
         fig, ax = plt.subplots(1, 1)
         anal_res.add_figure(fig, "fig", qu_id)
-        ax.plot(sweeps[0] * sweep_info[0].scale, T_qu_arr * 1e3, "o")
-        ax.set_xlabel(sweep_info[0].name_and_unit)
-        ax.set_ylabel("Temperature [mK]")
-    else:
-        fig, axs = plot_mag_phase(datadict=datadict, raw=True)
-        anal_res.add_figure(fig, "fig", qu_id)
 
+        if sweep_info[0].id == "index":
+            # ax.plot(sweeps[0] * sweep_info[0].scale, T_qu_arr * 1e3, "o")
+            ax.hist(T_qu_arr * 1e3, alpha=0.8)  # , bins=len(T_qu_arr)//3
+            ax.axvline(
+                np.nanmean(T_qu_arr) * 1e3, color="black", linestyle="--", label="Mean"
+            )
+            ax.axvline(
+                np.nanmedian(T_qu_arr) * 1e3,
+                color="tab:orange",
+                linestyle="--",
+                label="Median",
+            )
+
+            ax.axvline(
+                perc10 * 1e3, color="tab:pink", linestyle="-.", label="10th percentile"
+            )
+            ax.axvline(
+                perc90 * 1e3,
+                color="tab:purple",
+                linestyle="-.",
+                label="90th percentile",
+            )
+
+            ax.set_xlabel("Temperature [mK]")
+            ax.set_ylabel("Distribution")
+            ax.legend()
+
+        else:
+            ax.plot(sweeps[0] * sweep_info[0].scale, T_qu_arr * 1e3, "o")
+            ax.set_xlabel(sweep_info[0].name_and_unit)
+            ax.set_ylabel("Temperature [mK]")
+            ax.legend()
+
+    title = (
+        f"Qubit temperature {T_qu*1e3:.1f}"
+        + r"$\pm$"
+        + f"{T_qu_std*1e3:.1f}"
+        + " mK"
+        + f"\n$P_e$ / $P_g$ = {P_e*100:.2f} %"
+    )
     finalize_plot(
         fig,
-        f"Qubit temperature {T_qu*1e3:.1f} mK - $P_e$ = {P_e*100:.2f} %",
+        title,
         qu_id,
         fit_res,
         qubit_params,
@@ -366,9 +285,6 @@ def analyze_qubit_temperature_custom(
 def compute_qubit_temp_amplitude_fitted(
     amplitudes, proj_pi, proj_no_pi, qu_freq, fit_kwargs=None
 ):
-    h = 6.6e-34
-    kb = 1.38e-23
-
     if fit_kwargs is None:
         fit_kwargs = {}
 
@@ -376,12 +292,66 @@ def compute_qubit_temp_amplitude_fitted(
     fit_res_pi = fit.fit_oscillations(amplitudes, proj_pi, **fit_kwargs)
 
     A_no_pi = np.abs(fit_res_no_pi.params_by_name["A"])
+    A_no_pi_std = np.abs(fit_res_no_pi.std_err[0])
     A_pi = np.abs(fit_res_pi.params_by_name["A"])
+    A_pi_std = np.abs(fit_res_pi.std_err[0])
+
+    P_e, P_e_std = P_e_and_fit_error(A_pi, A_no_pi, A_pi_std, A_no_pi_std)
+    T_qu, T_qu_std = T_qu_and_fit_error(P_e, P_e_std, qu_freq)
+
+    if T_qu < 0:
+        return (np.nan, np.nan), (np.nan, np.nan), None
+
+    return (T_qu, T_qu_std), (P_e, P_e_std), (fit_res_no_pi, fit_res_pi)
+
+
+def P_e_and_fit_error(A_pi, A_no_pi, sigma_A_pi, sigma_A_no_pi):
+    """
+    Compute P_e and its propagated standard deviation.
+    """
+    D = A_pi + A_no_pi
+    Pe = A_no_pi / D
+
+    sigma_Pe = (
+        1.0
+        / D**2
+        * np.sqrt((A_no_pi**2) * sigma_A_pi**2 + (A_pi**2) * sigma_A_no_pi**2)
+    )
+
+    return Pe, sigma_Pe
+
+
+def T_qu_and_fit_error(Pe, sigma_Pe, qu_freq):
+    """
+    Compute T_qu and its propagated standard deviation from P_e.
+    """
+    h = 6.6e-34
+    kb = 1.38e-23
+
+    L = np.log(1.0 / Pe - 1.0)
+    C = h * qu_freq / kb
+
+    Tqu = C / L
+
+    sigma_Tqu = C / (L**2 * Pe * (1.0 - Pe)) * sigma_Pe
+
+    return Tqu, sigma_Tqu
+
+
+def compute_qubit_temp_amp_two_points(proj_pi, proj_no_pi, qu_freq, fit_kwargs=None):
+    h = 6.6e-34
+    kb = 1.38e-23
+
+    if fit_kwargs is None:
+        fit_kwargs = {}
+
+    A_no_pi = np.abs(proj_no_pi[1] - proj_no_pi[0])
+    A_pi = np.abs(proj_pi[1] - proj_pi[0])
 
     P_e = 1 - A_pi / (A_pi + A_no_pi)
     T_qu = h * qu_freq / (kb * np.log(1 / P_e - 1))
 
     if T_qu < 0:
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, (None, None)
 
-    return T_qu, P_e, (fit_res_no_pi, fit_res_pi)
+    return T_qu, P_e, (None, None)
