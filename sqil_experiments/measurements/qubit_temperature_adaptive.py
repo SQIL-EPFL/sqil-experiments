@@ -72,8 +72,11 @@ class QubitTemperatureAdaptive(ExperimentHandler):
 
         # Perform ef qubit spectroscopy
         qu_spec = QuSpec()
+        evaluated_params = spec_ef_params
+        if callable(spec_ef_params):
+            evaluated_params = spec_ef_params(qu_spec)
         qu_spec_res = qu_spec.run(
-            spec_ef_params,
+            evaluated_params,
             transition="ef",
             qu_ids=["q0"],
             options=spec_ef_options,
