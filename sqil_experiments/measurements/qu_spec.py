@@ -137,7 +137,10 @@ def qu_spec_analysis(
         if fit_res is not None:
             # Save fit result and extract parameters
             anal_res.add_fit(fit_res, "Combined mag-phase fit", qu_id)
-            param_id = f"resonance_frequency_{transition}"
+            if transition in ["aux", "helper"]:
+                param_id = f"{transition}_drive_frequency"
+            else:
+                param_id = f"resonance_frequency_{transition}"
             anal_res.add_params({param_id: fit_res.params_by_name["x0"]}, qu_id)
             # Plot
             x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))
