@@ -200,9 +200,15 @@ def analyze_qubit_temperature_adaptive(
     ax_freq.set_ylabel(qu_freq_info.name_and_unit)
     ax_freq.legend(loc="lower left")
 
+    title = (
+        f"Qubit temperature {np.nanmean(T_scaled):.1f}"
+        + r"$\pm$"
+        + f"{np.nanstd(T_scaled):.1f}"
+        + " mK"
+    )
     finalize_plot(
         fig,
-        f"Qubit temperature",
+        title,
         qu_id,
         fit_res=None,
         qubit_params=qubit_params,
