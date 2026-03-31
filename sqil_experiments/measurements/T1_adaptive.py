@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from IPython.display import clear_output
-from qu_spec import QuSpec
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
-from time_rabi import TimeRabi
 
+from sqil_experiments.measurements.qu_spec import QuSpec
 from sqil_experiments.measurements.T1 import T1
+from sqil_experiments.measurements.time_rabi import TimeRabi
 
 
 class T1Adaptive(ExperimentHandler):
