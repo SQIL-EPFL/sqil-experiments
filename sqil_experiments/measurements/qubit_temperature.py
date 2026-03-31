@@ -35,7 +35,15 @@ def create_experiment(
     amplitudes: ArrayLike,
     options: QubitTemperatureOptions | None = None,
     transition="ge",
+    probe_transition="ef",
+    **kwargs,
 ) -> Experiment:
+    """
+    Compare the difference in Rabi amplitude of a probe transition in two cases:
+    - without any inizialization (Rabi `probe_transition` directly)
+    - with inizialization (prepare the state with `transition` and then Rabi
+      `probe_transition`)
+    """
     opts = QubitTemperatureOptions() if options is None else options
     opts.transition = transition
 
@@ -56,12 +64,13 @@ def create_experiment(
             name=f"amp_{qubit.uid}",
             parameter=SweepParameter(f"amplitude_{qubit.uid}", amplitudes),
         ) as amplitude:
-            qop.x180(qubit, amplitude=amplitude, transition="ef")
+            qop.x180(qubit, amplitude=amplitude, transition=probe_transition)
             qop.measure(qubit, dsl.handles.result_handle(f"{qubit.uid}/data_no_pi"))
             qop.passive_reset(qubit)
 
-            qop.prepare_state(qubit, state="e")
-            qop.x180(qubit, amplitude=amplitude, transition="ef")
+            # qop.prepare_state(qubit, state="e")
+            qop.x180(qubit, transition=transition)
+            qop.x180(qubit, amplitude=amplitude, transition=probe_transition)
             qop.measure(qubit, dsl.handles.result_handle(f"{qubit.uid}/data_pi"))
             qop.passive_reset(qubit)
 
@@ -84,10 +93,7 @@ class QubitTemperature(ExperimentHandler):
     ):
         qubits = [self.qpu[qu_id] for qu_id in qu_ids]
         return create_experiment(
-            self.qpu,
-            qubits[0],
-            amplitude[0],
-            options=options,
+            self.qpu, qubits[0], amplitude[0], options=options, **kwargs
         )
 
     def analyze(self, path, *args, **kwargs):
@@ -120,7 +126,7 @@ def analyze_qubit_temperature(
     qubit_params = enrich_qubit_params(qpu[qu_id]) if qpu else {}
 
     if relevant_params is None:
-        relevant_params = [f"ef_drive_amplitude_pi"]
+        relevant_params = [f"ge_drive_amplitude_pi", f"ef_drive_amplitude_pi"]
 
     # TODO: define datas here - maybe make a fake datadict
     P_e = np.nan
