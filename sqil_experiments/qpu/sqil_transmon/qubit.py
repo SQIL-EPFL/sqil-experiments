@@ -167,8 +167,9 @@ class SqilTransmonParameters(QuantumParameters):
 
     # aux pulse parameters
 
-    aux_frequency: float | None = None
-    aux_drive_amplitude: float = 0.8
+    aux_drive_frequency: float | None = None
+    aux_drive_amplitude_pi: float = 0.8
+    aux_drive_amplitude_pi2: float = 0.4
     aux_drive_length: float = 200e-9
     aux_drive_pulse: dict = attrs.field(
         factory=lambda: {"function": "const", "can_compress": True},
@@ -259,9 +260,9 @@ class SqilTransmonParameters(QuantumParameters):
 
     @property
     def drive_frequency_aux(self) -> float | None:
-        if self.aux_lo_frequency is None or self.aux_frequency is None:
+        if self.aux_lo_frequency is None or self.aux_drive_frequency is None:
             return None
-        return self.aux_frequency - self.aux_lo_frequency
+        return self.aux_drive_frequency - self.aux_lo_frequency
 
     @property
     def readout_frequency(self) -> float | None:
@@ -319,14 +320,11 @@ class SqilTransmon(QuantumElement):
         """
         if transition is None:
             transition = "ge"
+
         if transition not in self.TRANSITIONS:
             raise ValueError(
                 f"Transition {transition!r} is not one of None, 'ge', 'ef' or 'aux'.",
             )
-
-        if transition == "aux":
-            line = "aux"
-            param_keys = ["amplitude", "length", "pulse"]
         elif transition == "hdawg":
             line = "hdawg"
             param_keys = ["amplitude_pi", "amplitude_pi2", "length", "pulse"]
@@ -335,6 +333,8 @@ class SqilTransmon(QuantumElement):
                 line = "drive"
             elif transition == "ef":
                 line = "drive_ef"
+            elif transition == "aux":
+                line = "aux"
             elif transition == "helper":
                 line = "drive_helper"
             param_keys = ["amplitude_pi", "amplitude_pi2", "length", "pulse"]
@@ -387,6 +387,10 @@ class SqilTransmon(QuantumElement):
             pass
         elif transition == "ef":
             line += "_ef"
+        elif transition == "helper":
+            line += "_helper"
+        elif transition == "aux":
+            line = "aux"
         else:
             raise (
                 f"Spectroscopy not defined for transition {transition}."
