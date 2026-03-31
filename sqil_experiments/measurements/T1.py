@@ -24,6 +24,7 @@ def create_experiment(
     qubits: QuantumElements,
     delays: QubitSweepPoints,
     options: TuneupExperimentOptions | None = None,
+    transition="ge",
 ) -> Experiment:
     # Define the custom options for the experiment
     opts = TuneupExperimentOptions() if options is None else options
@@ -72,8 +73,8 @@ def create_experiment(
                     alignment=SectionAlignment.RIGHT,
                 ):
                     for q, delay in zip(qubits, delays_sweep_pars):
-                        qop.prepare_state.omit_section(q, opts.transition[0])
-                        sec = qop.x180(q, transition=opts.transition)
+                        qop.prepare_state.omit_section(q, transition[0])
+                        sec = qop.x180(q, transition=transition)
                         sec.alignment = SectionAlignment.RIGHT
                         qop.delay(q, time=delay)
                 with dsl.section(name="main_measure", alignment=SectionAlignment.LEFT):
@@ -100,9 +101,11 @@ class T1(ExperimentHandler):
         "time": {"role": "x-axis", "unit": "s", "scale": 1e6},
     }
 
-    def sequence(self, time, qu_ids=0, options=None, *args, **kwargs):
+    def sequence(self, time, qu_ids=0, options=None, transition="ge", *args, **kwargs):
         qubits = [self.qpu[qu_id] for qu_id in qu_ids]
-        return create_experiment(self.qpu, qubits, time, options=options)
+        return create_experiment(
+            self.qpu, qubits, time, transition=transition, options=options
+        )
 
     def analyze(self, path, *args, **kwargs):
         return analyze_T1(path=path, **kwargs)
