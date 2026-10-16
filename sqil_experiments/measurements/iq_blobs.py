@@ -156,6 +156,20 @@ def analyze_iq_blobs(datadict, qpu=None, qu_id="q0", relevant_params=None, **kwa
         ax.set_xlabel("In-phase [mV]")
         ax.set_ylabel("Quadrature [mV]")
         ax.legend()
+    elif has_sweeps and len(states) == 3:  # one is the sweep
+        states.remove("sweep0")
+        fig, ax = plt.subplots(1, 1)
+        anal_res.add_figure(fig, "fig", qu_id)
+        distances = np.nan * np.zeros(len(sweeps[0]))
+        for i in range(len(sweeps[0])):
+            g = 1e3 * datadict.get(states[0], np.nan)
+            e = 1e3 * datadict.get(states[1], np.nan)
+            m_gi, m_gq = np.median(g[i, :].real), np.median(g[i, :].imag)
+            m_ei, m_eq = np.median(e[i, :].real), np.median(e[i, :].imag)
+            distances[i] = np.hypot(m_gi - m_ei, m_gq - m_eq)
+        ax.plot(sweeps[0] * sweep_info[0].scale, distances, "o-")
+        ax.set_xlabel(sweep_info[0].name_and_unit)
+        ax.set_ylabel("IQ distance [mV]")
 
     finalize_plot(
         fig,
