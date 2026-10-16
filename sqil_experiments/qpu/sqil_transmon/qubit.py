@@ -186,6 +186,10 @@ class SqilTransmonParameters(QuantumParameters):
         factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
     )
 
+    # External source
+    ext_frequency: float | None = None
+    ext_power: float | None = None
+
     # qubit-resonator coupling parameters
 
     qubit_resonator_coupling_strength_g: float = 0
