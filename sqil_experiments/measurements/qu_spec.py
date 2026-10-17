@@ -58,7 +58,7 @@ def create_experiment(
                 parameter=SweepParameter(f"frequency_{q.uid}", q_frequencies),
             ) as frequency:
                 with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
-                    qop.prepare_state.omit_section(q, state=transition[0])
+                    qop.prepare_state.omit_section(q, state=transition[:-1])
                     qop.set_frequency(q, frequency, transition=transition)
                     qop.qubit_spectroscopy_drive(q, transition=transition)
                     sec = qop.measure(q, dsl.handles.result_handle(q.uid))

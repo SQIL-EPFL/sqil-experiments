@@ -58,7 +58,7 @@ def create_experiment(
     ):
         with dsl.sweep(name="time_rabi_sweep", parameter=sweep_param) as pulse_len:
             with dsl.section(name="rabi drive", alignment=SectionAlignment.RIGHT):
-                qop.prepare_state(qubit, state=opts.transition[0])
+                qop.prepare_state(qubit, state=opts.transition[:-1])
                 qop.x180(
                     q=qubit,
                     length=pulse_len,
