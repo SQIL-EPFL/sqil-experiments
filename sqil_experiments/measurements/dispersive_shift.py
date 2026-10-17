@@ -64,20 +64,25 @@ def create_experiment(
             name=f"freq_{qubit.uid}",
             parameter=SweepParameter(f"frequencies_{qubit.uid}", frequencies),
         ) as frequency:
+            state_g = opts.transition[:-1]
+            state_e = opts.transition[:-2] + opts.transition[-1]
+
             qop.set_frequency(qubit, frequency=frequency, readout=True)
 
-            with dsl.section(
-                name=f"state {opts.transition[0]}", alignment=SectionAlignment.RIGHT
-            ):
-                qop.prepare_state.omit_section(qubit, state=opts.transition[0])
+            with dsl.section(name=f"state {state_g}", alignment=SectionAlignment.RIGHT):
+                qop.prepare_state.omit_section(qubit, state=state_g)
                 qop.measure(qubit, dsl.handles.result_handle(f"{qubit.uid}/data_g"))
                 # Small delay to let photons exit the cavity. Should be > 10 / kappa
-                qop.delay(qubit, 10e-6)
+                if (
+                    hasattr(qubit.parameters, "readout_kappa_tot")
+                    and qubit.parameters.readout_kappa_tot
+                ):
+                    qop.delay(qubit, 10 / qubit.parameters.readout_kappa_tot)
+                else:
+                    qop.delay(qubit, 5e-6)
 
-            with dsl.section(
-                name=f"state {opts.transition[1]}", alignment=SectionAlignment.RIGHT
-            ):
-                qop.prepare_state(qubit, state=opts.transition[1])
+            with dsl.section(name=f"state {state_e}", alignment=SectionAlignment.RIGHT):
+                qop.prepare_state(qubit, state=state_e)
                 qop.measure(qubit, dsl.handles.result_handle(f"{qubit.uid}/data_e"))
                 qop.passive_reset(qubit)
 
