@@ -53,3 +53,148 @@ def gaussian_square_sqil(
         gauss_sq -= delta
         gauss_sq /= 1 - delta
     return gauss_sq
+
+
+@register_pulse_functional
+def sinc(
+    x,
+    bandwidth=1e6,
+    window="hann",
+    zero_boundaries=False,
+    *,
+    length,
+    **_,
+):
+    """
+    Create a windowed sinc pulse whose FFT approximates a square spectrum.
+
+    Arguments:
+        length (float):
+            Total pulse duration (seconds)
+        bandwidth (float):
+            Target flat spectral bandwidth in Hz
+        window (str or None):
+            Window applied to truncate the sinc.
+            Options: "hann", "gaussian", None
+        zero_boundaries (bool):
+            Force pulse to zero at boundaries.
+
+    Returns:
+        pulse (np.ndarray): Sinc-shaped pulse
+    """
+
+    import numpy as np
+
+    # Center time axis
+    t = x - np.mean(x)
+
+    # Normalized sinc: np.sinc(z) = sin(pi z)/(pi z)
+    pulse = np.sinc(bandwidth * t)
+
+    # ---- Windowing (important physically) ----
+    if window == "hann":
+        w = np.hanning(len(x))
+        pulse *= w
+
+    elif window == "gaussian":
+        sigma = length / 6
+        w = np.exp(-(t**2) / (2 * sigma**2))
+        pulse *= w
+
+    elif window is None:
+        pass
+    else:
+        raise ValueError("window must be 'hann', 'gaussian', or None")
+
+    # ---- Optional boundary normalization ----
+    if zero_boundaries:
+        pulse -= pulse[0]
+        pulse /= np.max(np.abs(pulse))
+
+    # Normalize between -1 and 1
+    peak = np.max(np.abs(pulse))
+    if peak > 0:
+        pulse /= peak  # now in [-1, 1]
+
+    return pulse
+
+
+@register_pulse_functional
+def chirp(
+    x,
+    f_start,
+    f_stop,
+    phase=0.0,
+    envelope=None,
+    complex_output=True,
+    zero_boundaries=False,
+    normalize=True,
+    *,
+    length,
+    **_,
+):
+    """
+    Linear chirp pulse for SHFQC.
+
+    Arguments:
+        length (float):
+            Pulse duration (seconds)
+        f_start (float):
+            Start frequency (Hz)
+        f_stop (float):
+            Stop frequency (Hz)
+        phase (float):
+            Initial phase (radians)
+        envelope (str or None):
+            "hann", "gaussian", or None
+        complex_output (bool):
+            If True, returns complex IQ chirp.
+        zero_boundaries (bool):
+            Force pulse edges to zero.
+        normalize (bool):
+            Normalize waveform to [-1, 1].
+
+    Returns:
+        np.ndarray
+    """
+
+    import numpy as np
+
+    # ---- Center time axis ----
+    z = (x * length + length) / 2
+    t = z - np.mean(z)
+
+    T = length
+    k = (f_stop - f_start) / T  # chirp rate
+
+    # ---- Phase integral ----
+    phi = 2 * np.pi * (f_start * t + 0.5 * k * t**2) + phase
+
+    if complex_output:
+        pulse = np.exp(1j * phi)
+    else:
+        pulse = np.cos(phi)
+
+    # ---- Envelope ----
+    if envelope == "hann":
+        pulse *= np.hanning(len(x))
+
+    elif envelope == "gaussian":
+        sigma = length / 6
+        pulse *= np.exp(-(t**2) / (2 * sigma**2))
+
+    elif envelope is None:
+        pass
+    else:
+        raise ValueError("envelope must be 'hann', 'gaussian', or None")
+
+    # ---- Zero boundaries ----
+    if zero_boundaries:
+        pulse -= pulse[0]
+
+    # ---- SHFQC normalization ----
+    peak = np.max(np.abs(pulse))
+    if peak > 0:
+        pulse /= peak
+
+    return pulse
