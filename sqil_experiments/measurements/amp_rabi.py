@@ -80,7 +80,7 @@ def create_experiment(
             with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
                 with dsl.section(name="main_drive", alignment=SectionAlignment.RIGHT):
                     for q, q_amplitudes in zip(qubits, amps_sweep_pars, strict=False):
-                        qop.prepare_state.omit_section(q, state=opts.transition[0])
+                        qop.prepare_state.omit_section(q, state=opts.transition[:-1])
                         for _ in range(N_pulses):
                             sec = operation(
                                 q, amplitude=q_amplitudes, transition=opts.transition

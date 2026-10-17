@@ -93,7 +93,7 @@ def create_experiment(
             with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
                 with dsl.section(name="main_drive", alignment=SectionAlignment.RIGHT):
                     for q, wait_time, phase in zip(qubits, swp_delays, swp_phases):
-                        qop.prepare_state.omit_section(q, opts.transition[0])
+                        qop.prepare_state.omit_section(q, opts.transition[:-1])
                         qop.ramsey.omit_section(
                             q, wait_time, phase, transition=opts.transition
                         )

@@ -73,7 +73,7 @@ def create_experiment(
                     alignment=SectionAlignment.RIGHT,
                 ):
                     for q, delay in zip(qubits, delays_sweep_pars):
-                        qop.prepare_state.omit_section(q, transition[0])
+                        qop.prepare_state.omit_section(q, transition[:-1])
                         sec = qop.x180(q, transition=transition)
                         sec.alignment = SectionAlignment.RIGHT
                         qop.delay(q, time=delay)
