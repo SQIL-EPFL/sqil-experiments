@@ -19,107 +19,195 @@ if TYPE_CHECKING:
     from laboneq.dsl.experiment.pulse import Pulse
 
 
+# TODO: Add support for specifying integration kernels as a list of sample
+#       values.
+
+
 @classformatter
 @attrs.define()
 class StormcrowParameters(QuantumParameters):
+    """Qubit parameters for `TunableTransmonQubit` instances.
+
+    Attributes:
+        drive_lo_frequency:
+            Local oscillator frequency for the drive signals.
+        readout_lo_frequency:
+            Local oscillator frequency for the readout lines.
+
+        resonance_frequency_ge:
+            Resonance frequency of the qubits g-e transition.
+        resonance_frequency_ef:
+            Resonance frequency of the qubits e-f transition.
+        readout_resonator_frequency:
+            Readout resonantor frequency of the qubit.
+
+        ge_drive_amplitude_pi:
+            Amplitude for a pi pulse on the g-e transition.
+        ge_drive_amplitude_pi2:
+            Amplitude for a half-pi pulse on the g-e transition.
+        ge_drive_length:
+            Length of g-e transition drive pulses (seconds).
+        ge_drive_pulse:
+            Pulse parameters for g-e transition drive pulses.
+
+        ef_drive_amplitude_pi:
+            Amplitude for a pi pulse on the e-f transition.
+        ef_drive_amplitude_pi2:
+            Amplitude for a half-pi pulse on the e-f transition.
+        ef_drive_length:
+            Length of e-f transition drive pulses (seconds).
+        ef_drive_pulse:
+            Pulse parameters for e-f transition drive pulses.
+
+        qubit_resonator_coupling_strength_g:
+            Qubit resonator coupling strength.
+        ge_chi_shift:
+            Chi shift of the ground state and first excited state.
+
+        readout_amplitude:
+            Readout pulse amplitude.
+        readout_length:
+            Readout pulse length.
+        readout_pulse:
+            Pulse parameters for the readout pulse.
+        readout_integration_length:
+            Duration of the weighted integration.
+        readout_integration_delay:
+            Integration delay between readout pulse and data acquisition.
+            Defaults to 20 ns.
+        readout_integration_kernels_type:
+            The type of integration kernel to use, either "default" or "optimal".
+            Setting this parameter to "optimal" disables the modulation in the acquire
+            signal, as the optimal kernels are assumed to be already modulated.
+        readout_integration_kernels:
+            Either "default" or a list of pulse dictionaries.
+        readout_integration_discrimination_thresholds:
+            Either `None` or a list of thresholds.
+
+        reset_delay_length:
+            Duration of the wait time for reset.
+
+        drive_range:
+            Drive power setting, defaults to 10 dBm.
+        readout_range_out:
+            Readout output power setting, defaults to 5 dBm.
+        readout_range_in:
+            Readout input power setting, defaults to 10 dBm.
+
+        spectroscopy_length:
+            Length of the qubit drive pulse in spectroscopy (seconds).
+        spectroscopy_amplitude:
+            Amplitude of the qubit drive pulse in spectroscopy.
+
+        dc_slot:
+            Slot number on the DC source used for applying a DC voltage to the qubit.
+        dc_voltage_parking:
+            Qubit DC parking voltage.
+        flux_offset_voltage:
+            Offset voltage for flux control line - defaults to 0.
+    """
+
     # Helper parameter used to repeat experiments
     index: int = 0
 
-    # Local oscillators
+    # qubit coherence times
+
+    ge_T1: float = 0  # noqa: N815
+    ge_T2: float = 0  # noqa: N815
+    ge_T2_star: float = 0  # noqa: N815
+    ef_T1: float = 0  # noqa: N815
+    ef_T2: float = 0  # noqa: N815
+    ef_T2_star: float = 0  # noqa: N815
+
+    # local oscillators
+
     drive_lo_frequency: float | None = None
     aux_lo_frequency: float | None = None
     readout_lo_frequency: float | None = None
     readout_external_lo_frequency: float | None = None
     readout_external_lo_power: float | None = None
 
-    # Transmon mode (00 -> 10)
-    resonance_frequency_t01: float | None = None
-    resonance_frequency_t12: float | None = None
-    drive_range: float = 10
-    # g-e drive pulse parameters
-    t01_drive_amplitude_pi: float = 0.8
-    t01_drive_amplitude_pi2: float = 0.4
-    t01_drive_length: float = 50e-9
-    t01_drive_pulse: dict = attrs.field(
-        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
-    )
-    # e-f drive pulse parameters
-    t12_drive_amplitude_pi: float = 0.8
-    t12_drive_amplitude_pi2: float = 0.4
-    t12_drive_length: float = 50e-9
-    t12_drive_pulse: dict = attrs.field(
-        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
-    )
-    # Coherence
-    ge_T1: float = 0
-    ge_T2: float = 0
-    ge_T2_star: float = 0
-    ef_T1: float = 0
-    ef_T2: float = 0
-    ef_T2_star: float = 0
+    # resonance frequencies
 
-    # Fluxonium
-    resonance_frequency_f01: float = 100e6
-    hdawg_range: float = 5
-    f01_drive_amplitude_pi: float = 0.8
-    f01_drive_amplitude_pi2: float = 0.4
-    f01_drive_length: float = 50e-9
-    f01_drive_pulse: dict = attrs.field(
-        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
-    )
-
-    # Readout resonator
+    resonance_frequency_ge: float | None = None
+    resonance_frequency_ef: float | None = None
     readout_resonator_frequency: float | None = None
+
+    # readout resonator parameters
     readout_configuration: Literal["reflection", "hanger", "transmission"] | None = None
     readout_kappa_tot: float | None = None
-    readout_range_out: float = 10
-    readout_range_in: float = -10
-    # Readout and integration parameters
-    readout_amplitude: float = 1.0
-    readout_length: float = 2e-6
-    readout_integration_length: float = 2e-6
-    readout_pulse: dict = attrs.field(
-        factory=lambda: {
-            "function": "const",
-        },
-    )
-    readout_integration_delay: float = 20e-9
-    readout_integration_kernels_type: Literal["default", "optimal"] = "default"
-    readout_integration_kernels: list[dict] | None = None
-    readout_integration_discrimination_thresholds: list[float] | None = None
 
-    # Helper drive parameters (bound to drive_lo_frequency)
-    helper_drive_frequency: float | None = None
-    helper_drive_amplitude_pi: float = 0.8
-    helper_drive_amplitude_pi2: float = 0.4
-    helper_drive_length: float = 50e-9
-    helper_drive_pulse: dict = attrs.field(
+    # g-e drive pulse parameters
+
+    ge_drive_amplitude_pi: float = 0.8
+    ge_drive_amplitude_pi2: float = 0.4
+    ge_drive_length: float = 50e-9
+    ge_drive_pulse: dict = attrs.field(
         factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
     )
 
-    # Aux pulse parameters
-    aux_drive_frequency: float | None = None
-    aux_range: float = 10
-    aux_drive_amplitude_pi: float = 0.8
-    aux_drive_amplitude_pi2: float = 0.4
+    # e-f drive pulse parameters
+
+    ef_drive_amplitude_pi: float = 0.8
+    ef_drive_amplitude_pi2: float = 0.4
+    ef_drive_length: float = 50e-9
+    ef_drive_pulse: dict = attrs.field(
+        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
+    )
+
+    # aux pulse parameters
+
+    aux_frequency: float | None = None
+    aux_drive_amplitude: float = 0.8
     aux_drive_length: float = 200e-9
     aux_drive_pulse: dict = attrs.field(
         factory=lambda: {"function": "const", "can_compress": True},
     )
     aux_reset_delay_length: float = 100e-9
 
-    # External source
-    ext_frequency: float | None = None
-    ext_power: float | None = None
+    # hdawg parameters
+    ge_hdawg_drive_frequency: float = 100e6
+    hdawg_range: float = 5
+    hdawg_drive_amplitude_pi: float = 0.8
+    hdawg_drive_amplitude_pi2: float = 0.4
+    hdawg_drive_length: float = 50e-9
+    hdawg_drive_pulse: dict = attrs.field(
+        factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
+    )
 
     # qubit-resonator coupling parameters
+
     qubit_resonator_coupling_strength_g: float = 0
     ge_chi_shift: float = 0
 
-    # Reset parameters
+    # readout and integration parameters
+
+    readout_amplitude: float = 1.0
+    readout_length: float = 2e-6
+    readout_pulse: dict = attrs.field(
+        factory=lambda: {
+            "function": "const",
+        },
+    )
+    readout_integration_length: float = 2e-6
+    readout_integration_delay: float = 20e-9
+    readout_integration_kernels_type: Literal["default", "optimal"] = "default"
+    readout_integration_kernels: list[dict] | None = None
+    readout_integration_discrimination_thresholds: list[float] | None = None
+
+    # reset parameters
+
     reset_delay_length: float | None = 200e-6
 
-    # Spectroscopy parameters
+    # power range parameters
+
+    drive_range: float = 10
+    aux_range: float = 10
+    readout_range_out: float = 10
+    readout_range_in: float = -10
+
+    # spectroscopy parameters
+
     spectroscopy_length: float | None = 5e-6
     spectroscopy_amplitude: float | None = 1
     spectroscopy_pulse: dict = attrs.field(
@@ -129,40 +217,34 @@ class StormcrowParameters(QuantumParameters):
         },
     )
 
-    # Current parameters
+    # current parameters
     current: float | None = None
-    hf_current: float = None
-    zf_current: float = None
 
-    # Model parameters
-    model_params: dict = None
+    # flux parameters
+
+    dc_slot: int | None = 0
+    dc_voltage_parking: float | None = 0.0
+    flux_offset_voltage: float = 0.0
 
     @property
-    def drive_frequency_t01(self) -> float | None:
+    def drive_frequency_ge(self) -> float | None:
         """Qubit drive frequency for the g-e transition."""
-        if self.drive_lo_frequency is None or self.resonance_frequency_t01 is None:
+        if self.drive_lo_frequency is None or self.resonance_frequency_ge is None:
             return None
-        return self.resonance_frequency_t01 - self.drive_lo_frequency
+        return self.resonance_frequency_ge - self.drive_lo_frequency
 
     @property
-    def drive_frequency_t12(self) -> float | None:
+    def drive_frequency_ef(self) -> float | None:
         """Qubit drive frequency for the e-f transition."""
-        if self.drive_lo_frequency is None or self.resonance_frequency_t12 is None:
+        if self.drive_lo_frequency is None or self.resonance_frequency_ef is None:
             return None
-        return self.resonance_frequency_t12 - self.drive_lo_frequency
-
-    @property
-    def drive_frequency_helper(self) -> float | None:
-        """Qubit drive frequency for the helper transition."""
-        if self.drive_lo_frequency is None or self.helper_drive_frequency is None:
-            return None
-        return self.helper_drive_frequency - self.drive_lo_frequency
+        return self.resonance_frequency_ef - self.drive_lo_frequency
 
     @property
     def drive_frequency_aux(self) -> float | None:
-        if self.aux_lo_frequency is None or self.aux_drive_frequency is None:
+        if self.aux_lo_frequency is None or self.aux_frequency is None:
             return None
-        return self.aux_drive_frequency - self.aux_lo_frequency
+        return self.aux_frequency - self.aux_lo_frequency
 
     @property
     def readout_frequency(self) -> float | None:
@@ -188,7 +270,7 @@ class StormcrowParameters(QuantumParameters):
 @classformatter
 @attrs.define()
 class Stormcrow(QuantumElement):
-    """Class for a Stormcrow qubit."""
+    """A class for a superconducting, flux-tuneable Transmon Qubit."""
 
     PARAMETERS_TYPE = StormcrowParameters
     REQUIRED_SIGNALS = (
@@ -196,46 +278,48 @@ class Stormcrow(QuantumElement):
         "drive",
         "measure",
     )
-    OPTIONAL_SIGNALS = ("drive_ef", "drive_helper", "aux", "flux", "hdawg")
+    OPTIONAL_SIGNALS = ("drive_ef", "aux", "flux", "hdawg")
 
-    TRANSITIONS = ("t01", "t12", "helper", "aux", "f01")
+    TRANSITIONS = ("ge", "ef", "aux", "hdawg")
 
-    def transition_parameters(self, transition: str | None = None) -> tuple[str, dict]:
+    def transition_parameters(
+        self, transition: str | None = None, line: str | None = None
+    ) -> tuple[str, dict]:
         """Return the transition drive signal line and parameters.
 
         Arguments:
             transition:
                 The transition to return parameters for. May be `None`,
-                Transmon: `"t01"`, `"t12"`, `"helper"`
-                Fluxonium: `"f01"`
-                Auxiliary channel: `"aux"`
-                `None` defaults to `"t01"`.
+                `"ge"` or `"ef"`. `None` defaults to `"ge"`.
 
         Returns:
             line:
                 The drive line for the transition.
             params:
                 The drive parameters for the transition.
+
+        Raises:
+            ValueError:
+                If the transition is not `None`, `"ge"`, `"ef"` or  `"aux"`.
         """
         if transition is None:
-            transition = "t01"
-
+            transition = "ge"
         if transition not in self.TRANSITIONS:
             raise ValueError(
-                f"Transition {transition!r} is not one of None, 't01', 't12', 'f01', 'aux' or 'helper'.",
+                f"Transition {transition!r} is not one of None, 'ge', 'ef' or 'aux'.",
             )
-        elif transition == "hdawg":
-            line = "hdawg"
-            param_keys = ["amplitude_pi", "amplitude_pi2", "length", "pulse"]
-        else:
-            if transition == "t01":
-                line = "drive"
-            elif transition == "t12":
-                line = "drive_ef"
-            elif transition in ["aux", "reset"]:
+
+        if line is None:
+            if transition == "aux":
                 line = "aux"
-            elif transition == "helper":
-                line = "drive_helper"
+            elif transition == "hdawg":
+                line = "hdawg"
+            else:
+                line = "drive" if transition == "ge" else "drive_ef"
+
+        if line == "aux":
+            param_keys = ["amplitude", "length", "pulse"]
+        else:
             param_keys = ["amplitude_pi", "amplitude_pi2", "length", "pulse"]
 
         params = {
@@ -282,14 +366,10 @@ class Stormcrow(QuantumElement):
                The spectroscopy-pulse parameters.
         """
         line = "drive"
-        if transition == "t01":
+        if transition == "ge":
             pass
-        elif transition == "t12":
+        elif transition == "ef":
             line += "_ef"
-        elif transition == "helper":
-            line += "_helper"
-        elif transition == "aux":
-            line = "aux"
         else:
             raise (
                 f"Spectroscopy not defined for transition {transition}."
@@ -420,10 +500,10 @@ class Stormcrow(QuantumElement):
         calibration_items = {}
         if "drive" in self.signals:
             sig_cal = SignalCalibration()
-            if self.parameters.drive_frequency_t01 is not None:
+            if self.parameters.drive_frequency_ge is not None:
                 sig_cal.oscillator = Oscillator(
-                    uid=f"{self.uid}_drive_t01_osc",
-                    frequency=self.parameters.drive_frequency_t01,
+                    uid=f"{self.uid}_drive_ge_osc",
+                    frequency=self.parameters.drive_frequency_ge,
                     modulation_type=ModulationType.AUTO,
                 )
             sig_cal.local_oscillator = drive_lo
@@ -431,26 +511,15 @@ class Stormcrow(QuantumElement):
             calibration_items[self.signals["drive"]] = sig_cal
         if "drive_ef" in self.signals:
             sig_cal = SignalCalibration()
-            if self.parameters.drive_frequency_t12 is not None:
+            if self.parameters.drive_frequency_ef is not None:
                 sig_cal.oscillator = Oscillator(
                     uid=f"{self.uid}_drive_ef_osc",
-                    frequency=self.parameters.drive_frequency_t12,
+                    frequency=self.parameters.drive_frequency_ef,
                     modulation_type=ModulationType.AUTO,
                 )
             sig_cal.local_oscillator = drive_lo
             sig_cal.range = self.parameters.drive_range
             calibration_items[self.signals["drive_ef"]] = sig_cal
-        if "drive_helper" in self.signals:
-            sig_cal = SignalCalibration()
-            if self.parameters.drive_frequency_helper is not None:
-                sig_cal.oscillator = Oscillator(
-                    uid=f"{self.uid}_drive_helper_osc",
-                    frequency=self.parameters.drive_frequency_helper,
-                    modulation_type=ModulationType.AUTO,
-                )
-            sig_cal.local_oscillator = drive_lo
-            sig_cal.range = self.parameters.drive_range
-            calibration_items[self.signals["drive_helper"]] = sig_cal
         if "aux" in self.signals:
             sig_cal = SignalCalibration()
             if self.parameters.drive_frequency_aux is not None:
@@ -484,12 +553,16 @@ class Stormcrow(QuantumElement):
                     frequency=0, modulation_type=ModulationType.SOFTWARE
                 )
             calibration_items[self.signals["acquire"]] = sig_cal
+        if "flux" in self.signals:
+            calibration_items[self.signals["flux"]] = SignalCalibration(
+                voltage_offset=self.parameters.flux_offset_voltage,
+            )
         if "hdawg" in self.signals:
             sig_cal = SignalCalibration()
-            if self.parameters.resonance_frequency_f01 is not None:
+            if self.parameters.ge_hdawg_drive_frequency is not None:
                 sig_cal.oscillator = Oscillator(
                     uid=f"{self.uid}_drive_hdawg_ge_osc",
-                    frequency=self.parameters.resonance_frequency_f01,
+                    frequency=self.parameters.ge_hdawg_drive_frequency,
                     modulation_type=ModulationType.AUTO,
                 )
             # sig_cal.local_oscillator = drive_lo

@@ -15,8 +15,13 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+# TODO: Implement multistate 0-1-2 measurement operation
+
+# TODO: Add rotate_xy gate that performs a rotation about an axis in the xy-plane.
+
+
 class StormcrowOperations(dsl.QuantumOperations):
-    """Operations for Stormcrow."""
+    """Operations for Stormcrows."""
 
     QUBIT_TYPES = Stormcrow
 
@@ -77,7 +82,7 @@ class StormcrowOperations(dsl.QuantumOperations):
                 The oscillator frequency may be set directly instead
                 by passing `rf=False`.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
             readout:
                 If true, the frequency of the readout line is set
@@ -120,9 +125,9 @@ class StormcrowOperations(dsl.QuantumOperations):
             external_lo_frequency = q.parameters.readout_external_lo_frequency or 0
         else:
             signal_line, _ = q.transition_parameters(transition)
-            if transition == "aux":
+            if signal_line == "aux":
                 lo_frequency = q.parameters.aux_lo_frequency
-            elif transition == "hdawg":
+            elif signal_line == "hdawg":
                 lo_frequency = 0
             else:
                 lo_frequency = q.parameters.drive_lo_frequency
@@ -366,38 +371,28 @@ class StormcrowOperations(dsl.QuantumOperations):
             )
 
         # Detect auxiliary drive and skip
-        if state in ["aux", "helper"]:
+        if state == "a":
             return
 
-        # Fallback to usual naming convention
         if state == "g":
-            state = "t0"
-        elif state == "e":
-            state = "t1"
-        elif state == "f":
-            state = "t2"
-
-        if state == "t0":
             pass
-        elif state == "t1":
-            sec = self.x180(q, transition="t01")
+        elif state == "e":
+            sec = self.x180(q, transition="ge")
             sec.alignment = SectionAlignment.RIGHT
-        elif state == "t2":
-            sec = self.x180(q, transition="t01")
+        elif state == "f":
+            sec = self.x180(q, transition="ge")
             sec.alignment = SectionAlignment.RIGHT
-            sec = self.x180(q, transition="t12")
+            sec = self.x180(q, transition="ef")
             sec.alignment = SectionAlignment.RIGHT
         else:
-            raise ValueError(
-                f"Only states t0, t1 and t2 can be prepared, not {state!r}"
-            )
+            raise ValueError(f"Only states g, e and f can be prepared, not {state!r}")
 
     @dsl.quantum_operation
     def passive_reset(
         self,
         q: Stormcrow,
         delay: float | SweepParameter | None = None,
-        modifier: Literal["aux"] | None = None,
+        aux=False,
     ) -> None:
         """Reset a qubit into the ground state, 'g', using a long delay.
 
@@ -409,12 +404,11 @@ class StormcrowOperations(dsl.QuantumOperations):
                 to the qubit parameter `reset_delay_length`.
         """
         if delay is None:
-            if modifier is None:
-                delay = q.parameters.reset_delay_length
-            elif modifier == "aux":
-                q.parameters.aux_reset_delay_length
-            else:
-                raise ValueError("Modifier must be `None`, `aux` or `reset`.")
+            delay = (
+                q.parameters.reset_delay_length
+                if not aux
+                else q.parameters.aux_reset_delay_length
+            )
         self.delay.omit_section(q, time=delay)
 
     @dsl.quantum_operation
@@ -436,7 +430,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             angle:
                 The angle to rotate by in radians.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
             amplitude:
                 The amplitude of the rotation pulse. By default this
@@ -462,7 +456,7 @@ class StormcrowOperations(dsl.QuantumOperations):
         """
         drive_line, params = q.transition_parameters(transition)
 
-        if transition == "t12":
+        if transition in ["ef", "aux"]:
             section = dsl.active_section()
             section.on_system_grid = True
 
@@ -501,7 +495,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             q:
                 The qubit to rotate.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
             amplitude:
                 The amplitude of the rotation pulse. By default this
@@ -539,61 +533,6 @@ class StormcrowOperations(dsl.QuantumOperations):
         )
 
     @dsl.quantum_operation
-    def xm90(
-        self,
-        q: Stormcrow,
-        transition: str | None = None,
-        amplitude: float | None = None,
-        phase: float = 0.0,
-        length: float | None = None,
-        pulse: dict | None = None,
-    ) -> None:
-        """Rotate the qubit by -90 degrees about the X axis.
-
-        This implementation calls `rx(q, - π / 2, ...)`.
-
-        Arguments:
-            q:
-                The qubit to rotate.
-            transition:
-                The transition to rotate. By default this is "t01"
-                (i.e. the 0-1 transition).
-            amplitude:
-                The amplitude of the rotation pulse. By default this
-                is determined from the qubit parameter "amplitude_pi2".
-            phase:
-                The phase of the rotation pulse in radians. By default
-                this is 0.0.
-            length:
-                The duration of the rotation pulse. By default this
-                is determined by the qubit parameters.
-            pulse:
-                A dictionary of overrides for the qubit pulse parameters.
-
-                The dictionary may contain sweep parameters for the pulse
-                parameters other than `function`.
-
-                If the `function` parameter is different to the one
-                specified for the qubit, then this override dictionary
-                completely replaces the existing pulse parameters.
-
-                Otherwise the values override or extend the existing ones.
-        """
-        if amplitude is None:
-            _, params = q.transition_parameters(transition)
-            amplitude = params["amplitude_pi2"]
-
-        self.rx.omit_section(
-            q,
-            -self._PI_BY_2,
-            transition=transition,
-            amplitude=amplitude,
-            phase=phase,
-            length=length,
-            pulse=pulse,
-        )
-
-    @dsl.quantum_operation
     def x180(
         self,
         q: Stormcrow,
@@ -611,7 +550,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             q:
                 The qubit to rotate.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
             amplitude:
                 The amplitude of the rotation pulse. By default this
@@ -667,7 +606,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             angle:
                 The angle to rotate by in radians.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
             amplitude:
                 The amplitude of the rotation pulse. By default this
@@ -693,7 +632,7 @@ class StormcrowOperations(dsl.QuantumOperations):
         """
         drive_line, params = q.transition_parameters(transition)
 
-        if transition == "t12":
+        if transition == "ef":
             section = dsl.active_section()
             section.on_system_grid = True
 
@@ -732,7 +671,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             q:
                 The qubit to rotate.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
             amplitude:
                 The amplitude of the rotation pulse. By default this
@@ -770,61 +709,6 @@ class StormcrowOperations(dsl.QuantumOperations):
         )
 
     @dsl.quantum_operation
-    def ym90(
-        self,
-        q: Stormcrow,
-        transition: str | None = None,
-        amplitude: float | None = None,
-        phase: float = _PI_BY_2,
-        length: float | None = None,
-        pulse: dict | None = None,
-    ) -> None:
-        """Rotate the qubit by -90 degrees about the Y axis.
-
-        This implementation calls `ry(q, - π / 2, ...)`.
-
-        Arguments:
-            q:
-                The qubit to rotate.
-            transition:
-                The transition to rotate. By default this is "t01"
-                (i.e. the 0-1 transition).
-            amplitude:
-                The amplitude of the rotation pulse. By default this
-                is determined from the qubit parameter "amplitude_pi2".
-            phase:
-                The phase of the rotation pulse in radians. By default
-                this is `π / 2`.
-            length:
-                The duration of the rotation pulse. By default this
-                is determined by the qubit parameters.
-            pulse:
-                A dictionary of overrides for the qubit pulse parameters.
-
-                The dictionary may contain sweep parameters for the pulse
-                parameters other than `function`.
-
-                If the `function` parameter is different to the one
-                specified for the qubit, then this override dictionary
-                completely replaces the existing pulse parameters.
-
-                Otherwise the values override or extend the existing ones.
-        """
-        if amplitude is None:
-            _, params = q.transition_parameters(transition)
-            amplitude = params["amplitude_pi2"]
-
-        self.ry.omit_section(
-            q,
-            -self._PI_BY_2,
-            transition=transition,
-            amplitude=amplitude,
-            phase=phase,
-            length=length,
-            pulse=pulse,
-        )
-
-    @dsl.quantum_operation
     def y180(
         self,
         q: Stormcrow,
@@ -842,7 +726,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             q:
                 The qubit to rotate.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
             amplitude:
                 The amplitude of the rotation pulse. By default this
@@ -894,7 +778,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             angle:
                 The angle to rotate by in radians.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
         """
         drive_line, _params = q.transition_parameters(transition)
@@ -915,7 +799,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             q:
                 The qubit to rotate.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
         """
         self.rz.omit_section(q, self._PI_BY_2, transition=transition)
@@ -930,7 +814,7 @@ class StormcrowOperations(dsl.QuantumOperations):
             q:
                 The qubit to rotate.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
         """
         self.rz.omit_section(q, self._PI, transition=transition)
@@ -943,7 +827,7 @@ class StormcrowOperations(dsl.QuantumOperations):
         phase: float = 0.0,
         length: float | SweepParameter | None = None,
         pulse: dict | None = None,
-        transition: str = "t01",
+        transition: str = "ge",
     ) -> None:
         """Long pulse used for qubit spectroscopy that emulates a coherent field.
 
@@ -1016,16 +900,22 @@ class StormcrowOperations(dsl.QuantumOperations):
             echo_pulse:
                 The echo pulse to include.
             transition:
-                The transition to rotate. By default this is "t01"
+                The transition to rotate. By default this is "ge"
                 (i.e. the 0-1 transition).
+
+        Raise:
+            ValueError:
+                If the transition is not "ge" nor "ef".
+
+            ValueError:
+                If the echo pulse is not None and not x180 or y180.
         """
-        transition = "t01" if transition is None else transition
-        on_system_grid = False
-
-        if transition == "t12":
+        transition = "ge" if transition is None else transition
+        if transition == "ef":
             on_system_grid = True
-
-        if transition not in ["t01", "t12", "hdawg"]:
+        elif transition == "ge":
+            on_system_grid = False
+        else:
             raise ValueError(f"Support only ge or ef transitions, not {transition!r}")
 
         if echo_pulse is not None and echo_pulse not in ("x180", "y180"):
@@ -1068,8 +958,8 @@ class StormcrowOperations(dsl.QuantumOperations):
                 The qubit to reset.
         """
         # The ef-pulse is applied on the ge logical line
-        drive_line_ge, _ = q.transition_parameters("t01")
-        _, params_ef = q.transition_parameters("t12")
+        drive_line_ge, _ = q.transition_parameters("ge")
+        _, params_ef = q.transition_parameters("ef")
         frequency = q.parameters.drive_frequency_ef - q.parameters.drive_frequency_ge
         drag_params = list(params_ef["pulse"].items())
         rst_pls_params = {
@@ -1090,7 +980,7 @@ class StormcrowOperations(dsl.QuantumOperations):
     def active_reset(
         self,
         qubits: QuantumElements,
-        active_reset_states: str | tuple = "g",
+        active_reset_states: str | tuple = "ge",
         number_resets: int = 1,
         feedback_processing_delay: float = 0.0,
         handles: Sequence[str] | None = None,
@@ -1106,7 +996,7 @@ class StormcrowOperations(dsl.QuantumOperations):
                 qubit.
             active_reset_states:
                 The qubit states to reset. Can be any combination of ("g", "e", "f").
-                Default: "g"
+                Default: "ge"
             number_resets:
                 The number of active reset rounds to apply
             feedback_processing_delay:
@@ -1154,20 +1044,6 @@ class StormcrowOperations(dsl.QuantumOperations):
                                 self.x180.omit_section(q)
                             else:
                                 pass
-
-    # TODO: implement max section length for true multi qubit support
-    # max section legnths needs to be implemented also in the experiment
-    @dsl.quantum_operation(broadcast=False)
-    def reset(
-        self,
-        qubits: QuantumElements,
-        number_resets: int = 1,
-    ):
-        for q in qubits:
-            for nr in range(number_resets):
-                with dsl.section(name=f"reset_{nr}"):
-                    self.x180(q, transition="aux")
-                    self.passive_reset(q, aux=True)
 
     @dsl.quantum_operation(broadcast=False)
     def calibration_traces(
@@ -1254,16 +1130,14 @@ class StormcrowOperations(dsl.QuantumOperations):
         drive_line, params = q.transition_parameters(transition)
 
         section = dsl.active_section()
-        section.on_system_grid = False  # True # if should be true also add to rx and ry
+        section.on_system_grid = True
 
         if amplitude is None:
-            amplitude = params["amplitude_pi"]
+            amplitude = params["amplitude"]
         if length is None:
             length = params["length"]
 
-        rx_pulse = dsl.create_pulse(
-            params["pulse"], pulse, name=f"{transition}_x_pulse"
-        )
+        rx_pulse = dsl.create_pulse(params["pulse"], pulse, name="aux_x_pulse")
 
         dsl.play(
             q.signals[drive_line],
@@ -1286,7 +1160,7 @@ class StormcrowOperations(dsl.QuantumOperations):
         drive_line, params = q.transition_parameters(transition)
 
         section = dsl.active_section()
-        section.on_system_grid = False  # True
+        section.on_system_grid = True
 
         if amplitude is None:
             amplitude = params["amplitude_pi"]

@@ -58,7 +58,7 @@ def create_experiment(
                 parameter=SweepParameter(f"frequency_{q.uid}", q_frequencies),
             ) as frequency:
                 with dsl.section(name="drive", alignment=SectionAlignment.RIGHT):
-                    qop.prepare_state.omit_section(q, state=transition[:-1])
+                    qop.prepare_state.omit_section(q, state=transition[0])
                     qop.set_frequency(q, frequency, transition=transition)
                     qop.qubit_spectroscopy_drive(q, transition=transition)
                     sec = qop.measure(q, dsl.handles.result_handle(q.uid))
@@ -137,10 +137,7 @@ def qu_spec_analysis(
         if fit_res is not None:
             # Save fit result and extract parameters
             anal_res.add_fit(fit_res, "Combined mag-phase fit", qu_id)
-            if transition in ["aux", "helper"]:
-                param_id = f"{transition}_drive_frequency"
-            else:
-                param_id = f"resonance_frequency_{transition}"
+            param_id = f"resonance_frequency_{transition}"
             anal_res.add_params({param_id: fit_res.params_by_name["x0"]}, qu_id)
             # Plot
             x_fit = np.linspace(x_data[0], x_data[-1], np.max([2000, len(x_data)]))

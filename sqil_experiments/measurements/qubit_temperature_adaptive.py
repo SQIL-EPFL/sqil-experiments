@@ -72,11 +72,8 @@ class QubitTemperatureAdaptive(ExperimentHandler):
 
         # Perform ef qubit spectroscopy
         qu_spec = QuSpec()
-        evaluated_params = spec_ef_params
-        if callable(spec_ef_params):
-            evaluated_params = spec_ef_params(qu_spec)
         qu_spec_res = qu_spec.run(
-            evaluated_params,
+            spec_ef_params,
             transition="ef",
             qu_ids=["q0"],
             options=spec_ef_options,
@@ -200,15 +197,9 @@ def analyze_qubit_temperature_adaptive(
     ax_freq.set_ylabel(qu_freq_info.name_and_unit)
     ax_freq.legend(loc="lower left")
 
-    title = (
-        f"Qubit temperature {np.nanmean(T_scaled):.1f}"
-        + r"$\pm$"
-        + f"{np.nanstd(T_scaled):.1f}"
-        + " mK"
-    )
     finalize_plot(
         fig,
-        title,
+        f"Qubit temperature",
         qu_id,
         fit_res=None,
         qubit_params=qubit_params,
