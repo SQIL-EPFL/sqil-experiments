@@ -9,6 +9,7 @@ from laboneq.dsl.parameter import SweepParameter
 from laboneq.simple import SectionAlignment, dsl
 from laboneq_applications.typing import QuantumElements
 
+from sqil_experiments.measurements.helpers.pulses import concatenate_pulses
 from sqil_experiments.qpu.sqil_transmon.qubit import SqilTransmon
 
 if TYPE_CHECKING:
@@ -1301,6 +1302,50 @@ class SqilTransmonOperations(dsl.QuantumOperations):
             phase=phase,
             length=length,
             pulse=rx_pulse,
+        )
+
+    @dsl.quantum_operation
+    def measure_and_reset(
+        self,
+        q: SqilTransmon,
+        handle,
+        kernel_pulses: list[dict] | Literal["default"] | None = None,
+        do_reset=True,
+    ) -> None:
+        """Perform a measurement on the qubit and immediately reset it"""
+
+        measure_line, ro_params = q.readout_parameters()
+        reset_line, reset_params = q.reset_parameters()
+        acquire_line, ro_int_params = q.readout_integration_parameters()
+
+        if not do_reset or not reset_params["amplitude"]:
+            return self.measure(q, handle, None, kernel_pulses)
+
+        pulse, concatenated_length = concatenate_pulses(
+            pulse_a=ro_params["pulse"],
+            length_a=ro_params["length"],
+            amplitude_a=ro_params["amplitude"],
+            pulse_b=reset_params["pulse"],
+            length_b=reset_params["length"],
+            amplitude_b=reset_params["amplitude"],
+            gap=q.parameters.reset_delay_length,
+            sampling_interval=1e-9,
+            can_compress=False,
+            name="measure_and_reset",
+        )
+
+        kernels = q.get_integration_kernels(kernel_pulses)
+
+        dsl.measure(
+            measure_signal=q.signals[measure_line],
+            measure_pulse_amplitude=1,
+            measure_pulse_length=concatenated_length,
+            measure_pulse=pulse,
+            handle=handle,
+            acquire_signal=q.signals[acquire_line],
+            integration_kernel=kernels,
+            integration_length=ro_int_params["length"],
+            reset_delay=None,
         )
 
 

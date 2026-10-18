@@ -213,6 +213,13 @@ class SqilTransmonParameters(QuantumParameters):
     # reset parameters
 
     reset_delay_length: float | None = 200e-6
+    reset_amplitude: float = None
+    reset_length: float = None
+    reset_pulse: dict = attrs.field(
+        factory=lambda: {
+            "function": "const",
+        },
+    )
 
     # power range parameters
 
@@ -376,6 +383,19 @@ class SqilTransmon(QuantumElement):
             k: getattr(self.parameters, f"readout_integration_{k}") for k in param_keys
         }
         return "acquire", params
+
+    def reset_parameters(self) -> tuple[str, dict]:
+        """Return the measure line and the readout parameters.
+
+        Returns:
+           line:
+               The measure line of the qubit.
+           params:
+               The reset parameters.
+        """
+        param_keys = ["amplitude", "length", "pulse"]
+        params = {k: getattr(self.parameters, f"reset_{k}") for k in param_keys}
+        return "measure", params
 
     def spectroscopy_parameters(self, transition) -> tuple[str, dict]:
         """Return the qubit-spectroscopy line and the spectroscopy-pulse parameters.
