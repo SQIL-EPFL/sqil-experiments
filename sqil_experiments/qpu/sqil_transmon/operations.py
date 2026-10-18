@@ -533,6 +533,61 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         )
 
     @dsl.quantum_operation
+    def xm90(
+        self,
+        q: SqilTransmon,
+        transition: str | None = None,
+        amplitude: float | None = None,
+        phase: float = 0.0,
+        length: float | None = None,
+        pulse: dict | None = None,
+    ) -> None:
+        """Rotate the qubit by -90 degrees about the X axis.
+
+        This implementation calls `rx(q, - π / 2, ...)`.
+
+        Arguments:
+            q:
+                The qubit to rotate.
+            transition:
+                The transition to rotate. By default this is "ge"
+                (i.e. the 0-1 transition).
+            amplitude:
+                The amplitude of the rotation pulse. By default this
+                is determined from the qubit parameter "amplitude_pi2".
+            phase:
+                The phase of the rotation pulse in radians. By default
+                this is 0.0.
+            length:
+                The duration of the rotation pulse. By default this
+                is determined by the qubit parameters.
+            pulse:
+                A dictionary of overrides for the qubit pulse parameters.
+
+                The dictionary may contain sweep parameters for the pulse
+                parameters other than `function`.
+
+                If the `function` parameter is different to the one
+                specified for the qubit, then this override dictionary
+                completely replaces the existing pulse parameters.
+
+                Otherwise the values override or extend the existing ones.
+        """
+        if amplitude is None:
+            _, params = q.transition_parameters(transition)
+            amplitude = params["amplitude_pi2"]
+
+        self.rx.omit_section(
+            q,
+            -self._PI_BY_2,
+            transition=transition,
+            amplitude=amplitude,
+            phase=phase,
+            length=length,
+            pulse=pulse,
+        )
+
+    @dsl.quantum_operation
     def x180(
         self,
         q: SqilTransmon,
@@ -701,6 +756,61 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         self.ry.omit_section(
             q,
             self._PI_BY_2,
+            transition=transition,
+            amplitude=amplitude,
+            phase=phase,
+            length=length,
+            pulse=pulse,
+        )
+
+    @dsl.quantum_operation
+    def ym90(
+        self,
+        q: SqilTransmon,
+        transition: str | None = None,
+        amplitude: float | None = None,
+        phase: float = _PI_BY_2,
+        length: float | None = None,
+        pulse: dict | None = None,
+    ) -> None:
+        """Rotate the qubit by -90 degrees about the Y axis.
+
+        This implementation calls `ry(q, - π / 2, ...)`.
+
+        Arguments:
+            q:
+                The qubit to rotate.
+            transition:
+                The transition to rotate. By default this is "ge"
+                (i.e. the 0-1 transition).
+            amplitude:
+                The amplitude of the rotation pulse. By default this
+                is determined from the qubit parameter "amplitude_pi2".
+            phase:
+                The phase of the rotation pulse in radians. By default
+                this is `π / 2`.
+            length:
+                The duration of the rotation pulse. By default this
+                is determined by the qubit parameters.
+            pulse:
+                A dictionary of overrides for the qubit pulse parameters.
+
+                The dictionary may contain sweep parameters for the pulse
+                parameters other than `function`.
+
+                If the `function` parameter is different to the one
+                specified for the qubit, then this override dictionary
+                completely replaces the existing pulse parameters.
+
+                Otherwise the values override or extend the existing ones.
+        """
+        if amplitude is None:
+            _, params = q.transition_parameters(transition)
+            amplitude = params["amplitude_pi2"]
+
+        self.ry.omit_section(
+            q,
+            -self._PI_BY_2,
             transition=transition,
             amplitude=amplitude,
             phase=phase,
@@ -1047,6 +1157,20 @@ class SqilTransmonOperations(dsl.QuantumOperations):
                             else:
                                 pass
 
+    # TODO: implement max section length for true multi qubit support
+    # max section legnths needs to be implemented also in the experiment
+    @dsl.quantum_operation(broadcast=False)
+    def reset(
+        self,
+        qubits: QuantumElements,
+        number_resets: int = 1,
+    ):
+        for q in qubits:
+            for nr in range(number_resets):
+                with dsl.section(name=f"reset_{nr}"):
+                    self.aux_drive(q)
+                    self.passive_reset(q, aux=True)
+
     @dsl.quantum_operation(broadcast=False)
     def calibration_traces(
         self,
@@ -1135,7 +1259,7 @@ class SqilTransmonOperations(dsl.QuantumOperations):
         section.on_system_grid = True
 
         if amplitude is None:
-            amplitude = params["amplitude"]
+            amplitude = params["amplitude_pi"]
         if length is None:
             length = params["length"]
 

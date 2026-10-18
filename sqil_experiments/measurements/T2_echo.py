@@ -129,7 +129,7 @@ def create_experiment(
             with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
                 with dsl.section(name="main_drive", alignment=SectionAlignment.RIGHT):
                     for q, delay in zip(qubits, delays_sweep_pars):
-                        qop.prepare_state.omit_section(q, opts.transition[0])
+                        qop.prepare_state.omit_section(q, opts.transition[:-1])
                         qop.ramsey(
                             q,
                             delay,
