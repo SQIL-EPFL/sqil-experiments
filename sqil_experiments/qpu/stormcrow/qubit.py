@@ -51,12 +51,12 @@ class StormcrowParameters(QuantumParameters):
         factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
     )
     # Coherence
-    ge_T1: float = 0
-    ge_T2: float = 0
-    ge_T2_star: float = 0
-    ef_T1: float = 0
-    ef_T2: float = 0
-    ef_T2_star: float = 0
+    t01_T1: float = 0
+    t01_T2: float = 0
+    t01_T2_star: float = 0
+    t12_T1: float = 0
+    t12_T2: float = 0
+    t12_T2_star: float = 0
 
     # Fluxonium
     resonance_frequency_f01: float = 100e6
@@ -67,6 +67,10 @@ class StormcrowParameters(QuantumParameters):
     f01_drive_pulse: dict = attrs.field(
         factory=lambda: {"function": "gaussian_square_sqil", "can_compress": True},
     )
+    # Coherence
+    f01_T1: float = 0
+    f01_T2: float = 0
+    f01_T2_star: float = 0
 
     # Readout resonator
     readout_resonator_frequency: float | None = None
@@ -114,7 +118,7 @@ class StormcrowParameters(QuantumParameters):
 
     # qubit-resonator coupling parameters
     qubit_resonator_coupling_strength_g: float = 0
-    ge_chi_shift: float = 0
+    t01_chi_shift: float = 0
 
     # Reset parameters
     reset_delay_length: float | None = 200e-6

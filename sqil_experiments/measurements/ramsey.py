@@ -28,6 +28,7 @@ def create_experiment(
     delays: QubitSweepPoints,
     detunings: float | Sequence[float] | None = None,
     options: TuneupExperimentOptions | None = None,
+    transition: str = "ge",
 ) -> Experiment:
     # Define the custom options for the experiment
     opts = TuneupExperimentOptions() if options is None else options
@@ -93,9 +94,9 @@ def create_experiment(
             with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
                 with dsl.section(name="main_drive", alignment=SectionAlignment.RIGHT):
                     for q, wait_time, phase in zip(qubits, swp_delays, swp_phases):
-                        qop.prepare_state.omit_section(q, opts.transition[:-1])
+                        qop.prepare_state.omit_section(q, transition[:-1])
                         qop.ramsey.omit_section(
-                            q, wait_time, phase, transition=opts.transition
+                            q, wait_time, phase, transition=transition
                         )
                 with dsl.section(name="main_measure", alignment=SectionAlignment.LEFT):
                     for q in qubits:
@@ -121,9 +122,20 @@ class Ramsey(ExperimentHandler):
         "time": {"role": "x-axis", "unit": "s", "scale": 1e6},
     }
 
-    def sequence(self, time, detuning, qu_ids=["q0"], options=None, *args, **kwargs):
+    def sequence(
+        self,
+        time,
+        detuning,
+        qu_ids=["q0"],
+        options=None,
+        transition="ge",
+        *args,
+        **kwargs,
+    ):
         qubits = [self.qpu[qu_id] for qu_id in qu_ids]
-        return create_experiment(self.qpu, qubits, time, detuning, options=options)
+        return create_experiment(
+            self.qpu, qubits, time, detuning, options=options, transition=transition
+        )
 
     def analyze(self, path, *args, **kwargs):
         return analyze_ramsey(path=path, **kwargs)
