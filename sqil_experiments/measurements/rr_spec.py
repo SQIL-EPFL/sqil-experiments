@@ -115,7 +115,7 @@ def rr_spec_analysis(
     qu_id="q0",
     qpu=None,
     at_sweep_idx=None,
-    relevant_params=ONE_TONE_PARAMS,
+    relevant_params=["readout_amplitude", "readout_length"],
     **kwargs,
 ) -> AnalysisResult:
     # Prepare analysis result object

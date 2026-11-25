@@ -4,7 +4,7 @@ from laboneq.dsl.enums import AcquisitionType, AveragingMode
 from laboneq.dsl.quantum.qpu import QPU
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
 from laboneq.workflow import option_field, task_options
-from laboneq_applications.core.validation import validate_and_convert_qubits_sweeps
+from laboneq_applications.conversion import sweeps_per_quantum_element
 from laboneq_applications.experiments.options import BaseExperimentOptions
 from laboneq_applications.typing import QuantumElements, QubitSweepPoints
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
@@ -40,10 +40,10 @@ def create_experiment(
     # Define the custom options for the experiment
     opts = QuSpecOptions() if options is None else options
 
-    qubits, frequencies = validate_and_convert_qubits_sweeps(qubits, frequencies)
+    sweep_per_qubit = sweeps_per_quantum_element(qubits, frequencies)
 
-    max_measure_section_length = qpu.measure_section_length(qubits)
     qop = qpu.quantum_operations
+    max_measure_section_length = qop.measure_section_length(qubits)
     with dsl.acquire_loop_rt(
         count=opts.count,
         averaging_mode=opts.averaging_mode,
@@ -52,7 +52,7 @@ def create_experiment(
         repetition_time=opts.repetition_time,
         reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
-        for q, q_frequencies in zip(qubits, frequencies):
+        for q, q_frequencies in sweep_per_qubit:
             with dsl.sweep(
                 name=f"freqs_{q.uid}",
                 parameter=SweepParameter(f"frequency_{q.uid}", q_frequencies),

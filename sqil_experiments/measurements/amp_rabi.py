@@ -10,7 +10,10 @@ from laboneq.dsl.quantum import QPU
 from laboneq.dsl.quantum.quantum_element import QuantumElement
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
 from laboneq.workflow import option_field, task_options
-from laboneq_applications.core import validation
+from laboneq_applications.conversion import (
+    as_quantum_element_list,
+    sweeps_per_quantum_element,
+)
 from laboneq_applications.experiments.options import (
     BaseExperimentOptions,
     TuneupExperimentOptions,
@@ -35,29 +38,18 @@ def create_experiment(
 ) -> Experiment:
     # Define the custom options for the experiment
     opts = TuneupExperimentOptions() if options is None else options
-    opts.transition = transition
-    qubits, amplitudes = validation.validate_and_convert_qubits_sweeps(
-        qubits, amplitudes
-    )
+    # opts.transition = transition
 
+    qubits = as_quantum_element_list(qubits)
     amps_sweep_pars = [
         SweepParameter(f"amplitude_{q.uid}", q_amplitudes, axis_name=f"{q.uid}")
-        for q, q_amplitudes in zip(qubits, amplitudes, strict=False)
+        for q, q_amplitudes in sweeps_per_quantum_element(qubits, amplitudes)
     ]
+    qop = qpu.quantum_operations
     # We will fix the length of the measure section to the longest section among
     # the qubits to allow the qubits to have different readout and/or
     # integration lengths.
-    qop = qpu.quantum_operations
     max_measure_section_length = qop.measure_section_length(qubits)
-
-    if hasattr(qop, operation_id):
-        operation = getattr(qop, operation_id)
-    else:
-        raise AttributeError(
-            f"{operation_id} is not a valid operation."
-            " Check your QuantumOperations object."
-        )
-
     with dsl.acquire_loop_rt(
         count=opts.count,
         averaging_mode=opts.averaging_mode,
@@ -69,6 +61,8 @@ def create_experiment(
         with dsl.sweep(
             name="rabi_amp_sweep",
             parameter=amps_sweep_pars,
+            # chunk_count=opts.chunk_count,
+            # auto_chunking=opts.auto_chunking,
         ):
             if opts.active_reset:
                 qop.active_reset(
@@ -80,12 +74,9 @@ def create_experiment(
             with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
                 with dsl.section(name="main_drive", alignment=SectionAlignment.RIGHT):
                     for q, q_amplitudes in zip(qubits, amps_sweep_pars, strict=False):
-                        qop.prepare_state.omit_section(q, state=opts.transition[:-1])
-                        for _ in range(N_pulses):
-                            sec = operation(
-                                q, amplitude=q_amplitudes, transition=opts.transition
-                            )
-                            sec.alignment = SectionAlignment.RIGHT
+                        qop.prepare_state.omit_section(q, state=transition[:-1])
+                        sec = qop.x180(q, amplitude=q_amplitudes, transition=transition)
+                        sec.alignment = SectionAlignment.RIGHT
                 with dsl.section(name="main_measure", alignment=SectionAlignment.LEFT):
                     for q in qubits:
                         sec = qop.measure(q, dsl.handles.result_handle(q.uid))
@@ -114,8 +105,8 @@ class AmpRabi(ExperimentHandler):
         qubits = [self.qpu[qu_id] for qu_id in qu_ids]
         return create_experiment(
             self.qpu,
-            qubits[0],
-            amplitude[0],
+            qubits,
+            amplitude,
             transition=transition,
             options=options,
             N_pulses=N_pulses,

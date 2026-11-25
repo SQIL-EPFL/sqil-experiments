@@ -10,7 +10,7 @@ from laboneq.dsl.quantum import QPU
 from laboneq.dsl.quantum.quantum_element import QuantumElement
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
 from laboneq.workflow import option_field, task_options
-from laboneq_applications.core import validation
+from laboneq_applications.conversion import sweeps_per_quantum_element
 from laboneq_applications.experiments.options import (
     BaseExperimentOptions,
     TuneupExperimentOptions,
@@ -34,11 +34,14 @@ def create_experiment(
     qpu: QPU,
     qubits: QuantumElements,
     delays: QubitSweepPoints,
+    transition="ge",
     options: EchoExperimentOptions | None = None,
 ) -> Experiment:
     # Define the custom options for the experiment
     opts = EchoExperimentOptions() if options is None else options
-    qubits, delays_T1 = validation.validate_and_convert_qubits_sweeps(qubits, delays)
+    opts.transition = transition
+
+    sweep_per_qubit = sweeps_per_quantum_element(qubits, delays)
 
     if (
         opts.use_cal_traces
@@ -52,7 +55,7 @@ def create_experiment(
 
     delays_sweep_pars = [
         SweepParameter(f"delays_{q.uid}", q_delays, axis_name=f"{q.uid}")
-        for q, q_delays in zip(qubits, delays)
+        for q, q_delays in sweep_per_qubit
     ]
 
     # We will fix the length of the measure section to the longest section among
@@ -85,7 +88,7 @@ def create_experiment(
                     alignment=SectionAlignment.RIGHT,
                 ):
                     for q, delay in zip(qubits, delays_sweep_pars):
-                        qop.prepare_state.omit_section(q, opts.transition[0])
+                        qop.prepare_state.omit_section(q, opts.transition[:-1])
                         sec = qop.x180(q, transition=opts.transition)
                         sec.alignment = SectionAlignment.RIGHT
                         qop.delay(q, time=delay)
@@ -121,7 +124,7 @@ def create_experiment(
             with dsl.section(name="echo", alignment=SectionAlignment.RIGHT):
                 with dsl.section(name="echo_drive", alignment=SectionAlignment.RIGHT):
                     for q, delay in zip(qubits, delays_sweep_pars):
-                        qop.prepare_state.omit_section(q, opts.transition[0])
+                        qop.prepare_state.omit_section(q, opts.transition[:-1])
                         qop.ramsey(
                             q,
                             delay,
@@ -156,9 +159,13 @@ class InterleavedT1Echo(ExperimentHandler):
         "time": {"role": "x-axis", "unit": "s", "scale": 1e6},
     }
 
-    def sequence(self, time, qu_ids=["q0"], options=None, *args, **kwargs):
+    def sequence(
+        self, time, qu_ids=["q0"], transition="ge", options=None, *args, **kwargs
+    ):
         qubits = [self.qpu[qu_id] for qu_id in qu_ids]
-        return create_experiment(self.qpu, qubits, time, options=options)
+        return create_experiment(
+            self.qpu, qubits, time, transition=transition, options=options
+        )
 
     def analyze(self, path, *args, **kwargs):
         return analyze_interleaved_T1_echo(path=path, **kwargs)

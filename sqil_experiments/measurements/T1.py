@@ -8,7 +8,7 @@ import sqil_core.fit as fit
 from laboneq.dsl.enums import AveragingMode
 from laboneq.dsl.quantum import QPU
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
-from laboneq_applications.core import validation
+from laboneq_applications.conversion import sweeps_per_quantum_element
 from laboneq_applications.experiments.options import TuneupExperimentOptions
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
@@ -28,7 +28,7 @@ def create_experiment(
 ) -> Experiment:
     # Define the custom options for the experiment
     opts = TuneupExperimentOptions() if options is None else options
-    qubits, delays = validation.validate_and_convert_qubits_sweeps(qubits, delays)
+    sweep_per_qubit = sweeps_per_quantum_element(qubits, delays)
     if (
         opts.use_cal_traces
         and AveragingMode(opts.averaging_mode) == AveragingMode.SEQUENTIAL
@@ -41,7 +41,7 @@ def create_experiment(
 
     delays_sweep_pars = [
         SweepParameter(f"delays_{q.uid}", q_delays, axis_name=f"{q.uid}")
-        for q, q_delays in zip(qubits, delays)
+        for q, q_delays in sweep_per_qubit
     ]
     # We will fix the length of the measure section to the longest section among
     # the qubits to allow the qubits to have different readout and/or

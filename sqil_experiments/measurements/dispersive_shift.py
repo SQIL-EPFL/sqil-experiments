@@ -193,26 +193,29 @@ def analyze_dispersive_shift(
         anal_res.add_figure(fig, "fig", qu_id)
         for lines, lab in zip([g_lines, e_lines], ["g", "e"]):
             ax.plot(lines[0].get_xdata(), lines[0].get_ydata(), "o", label=lab)
-            ax.plot(lines[1].get_xdata(), lines[1].get_ydata(), color="tab:red")
+            # Plot fit
+            if len(lines) > 1:
+                ax.plot(lines[1].get_xdata(), lines[1].get_ydata(), color="tab:red")
 
         # Draw two vertical lines
-        x1, x2 = fr_g * 1e-9, fr_e * 1e-9
-        ax.axvline(x=x1, color="tab:blue", linestyle="--")
-        ax.axvline(x=x2, color="tab:orange", linestyle="--")
-        # Draw the arrow with two heads (symbolizing distance between lines)
-        arrow = patches.FancyArrowPatch(
-            (x1, 0),  # Start point (x1, 0)
-            (x2, 0),  # End point (x2, 0)
-            arrowstyle="<|-|>",  # Arrow style with two heads
-            mutation_scale=20,  # Size of the arrows
-            color="black",
-            linewidth=2,
-        )
-        # Add the arrow to the plot
-        ax.add_patch(arrow)
-        # Add text above the arrow
-        midpoint_x = (x1 + x2) / 2  # Find the midpoint of the x-coordinates
-        ax.text(midpoint_x, 0.005, r"$\chi$", ha="center", va="bottom")
+        if fr_g and fr_e:
+            x1, x2 = fr_g * 1e-9, fr_e * 1e-9
+            ax.axvline(x=x1, color="tab:blue", linestyle="--")
+            ax.axvline(x=x2, color="tab:orange", linestyle="--")
+            # Draw the arrow with two heads (symbolizing distance between lines)
+            arrow = patches.FancyArrowPatch(
+                (x1, 0),  # Start point (x1, 0)
+                (x2, 0),  # End point (x2, 0)
+                arrowstyle="<|-|>",  # Arrow style with two heads
+                mutation_scale=20,  # Size of the arrows
+                color="black",
+                linewidth=2,
+            )
+            # Add the arrow to the plot
+            ax.add_patch(arrow)
+            # Add text above the arrow
+            midpoint_x = (x1 + x2) / 2  # Find the midpoint of the x-coordinates
+            ax.text(midpoint_x, 0.005, r"$\chi$", ha="center", va="bottom")
 
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)

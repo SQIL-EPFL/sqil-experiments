@@ -9,7 +9,10 @@ from laboneq.dsl.enums import AveragingMode
 from laboneq.dsl.quantum import QPU
 from laboneq.simple import Experiment, SectionAlignment, SweepParameter, dsl
 from laboneq_applications.analysis.ramsey import validate_and_convert_detunings
-from laboneq_applications.core import validation
+from laboneq_applications.conversion import (
+    as_quantum_element_list,
+    sweeps_per_quantum_element,
+)
 from laboneq_applications.experiments.options import TuneupExperimentOptions
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
@@ -32,22 +35,19 @@ def create_experiment(
 ) -> Experiment:
     # Define the custom options for the experiment
     opts = TuneupExperimentOptions() if options is None else options
-    qubits, delays = validation.validate_and_convert_qubits_sweeps(qubits, delays)
+
+    qubits = as_quantum_element_list(qubits)
     detunings = validate_and_convert_detunings(qubits, detunings)
-    if (
-        opts.use_cal_traces
-        and AveragingMode(opts.averaging_mode) == AveragingMode.SEQUENTIAL
-    ):
-        raise ValueError(
-            "'AveragingMode.SEQUENTIAL' (or {AveragingMode.SEQUENTIAL}) cannot be used "
-            "with calibration traces because the calibration traces are added "
-            "outside the sweep."
-        )
+
+    qop = qpu.quantum_operations
+    # We will fix the length of the measure section to the longest section among
+    # the qubits to allow the qubits to have different readout and/or
+    # integration lengths.
+    max_measure_section_length = qop.measure_section_length(qubits)
 
     swp_delays = []
     swp_phases = []
-    for i, q in enumerate(qubits):
-        q_delays = delays[i]
+    for i, (q, q_delays) in enumerate(sweeps_per_quantum_element(qubits, delays)):
         swp_delays += [
             SweepParameter(
                 uid=f"wait_time_{q.uid}",
@@ -67,11 +67,6 @@ def create_experiment(
             ),
         ]
 
-    # We will fix the length of the measure section to the longest section among
-    # the qubits to allow the qubits to have different readout and/or
-    # integration lengths.
-    qop = qpu.quantum_operations
-    max_measure_section_length = qop.measure_section_length(qubits)
     with dsl.acquire_loop_rt(
         count=opts.count,
         averaging_mode=opts.averaging_mode,
@@ -83,6 +78,8 @@ def create_experiment(
         with dsl.sweep(
             name="ramsey_sweep",
             parameter=swp_delays + swp_phases,
+            # chunk_count=opts.chunk_count,
+            # auto_chunking=opts.auto_chunking,
         ):
             if opts.active_reset:
                 qop.active_reset(
@@ -93,7 +90,9 @@ def create_experiment(
                 )
             with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
                 with dsl.section(name="main_drive", alignment=SectionAlignment.RIGHT):
-                    for q, wait_time, phase in zip(qubits, swp_delays, swp_phases):
+                    for q, wait_time, phase in zip(
+                        qubits, swp_delays, swp_phases, strict=False
+                    ):
                         qop.prepare_state.omit_section(q, transition[:-1])
                         qop.ramsey.omit_section(
                             q, wait_time, phase, transition=transition
@@ -104,15 +103,6 @@ def create_experiment(
                         # Fix the length of the measure section
                         sec.length = max_measure_section_length
                         qop.passive_reset(q)
-        if opts.use_cal_traces:
-            qop.calibration_traces.omit_section(
-                qubits=qubits,
-                states=opts.cal_states,
-                active_reset=opts.active_reset,
-                active_reset_states=opts.active_reset_states,
-                active_reset_repetitions=opts.active_reset_repetitions,
-                measure_section_length=max_measure_section_length,
-            )
 
 
 class Ramsey(ExperimentHandler):

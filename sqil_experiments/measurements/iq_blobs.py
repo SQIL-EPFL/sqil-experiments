@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from laboneq import workflow
 from laboneq.simple import AveragingMode, Experiment, SectionAlignment, dsl
-from laboneq_applications.core import validation
+from laboneq_applications.conversion import sweeps_per_quantum_element
 from laboneq_applications.experiments.options import BaseExperimentOptions
 from sqil_core.experiment import AnalysisResult, ExperimentHandler, multi_qubit_handler
 from sqil_core.utils import *
@@ -34,7 +34,7 @@ def create_experiment(
 ) -> Experiment:
     # Define the custom options for the experiment
     opts = IQBlobsOptions() if options is None else options
-    qubits = validation.validate_and_convert_qubits_sweeps(qubits)
+    # sweep_per_qubit = sweeps_per_quantum_element(qubits)
 
     # We will fix the length of the measure section to the longest section among
     # the qubits to allow the qubits to have different readout and/or
