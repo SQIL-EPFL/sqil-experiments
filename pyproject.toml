@@ -15,9 +15,9 @@ black = "==24.10.0"
 isort = "==5.9.3"
 plottr = ">=0.14.0,<0.15.0"
 tqdm = "^4.67.1"
-laboneq = "^25.10.3"
-laboneq-applications = "^25.10.0"
 sqil-core = "^2.0.0"
+laboneq = ">=26.10.1"
+laboneq-applications = ">=26.10.1"
 
 
 [build-system]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
@@ -1025,8 +1026,10 @@ class StormcrowOperations(dsl.QuantumOperations):
         if transition == "t12":
             on_system_grid = True
 
-        if transition not in ["t01", "t12", "hdawg"]:
-            raise ValueError(f"Support only ge or ef transitions, not {transition!r}")
+        if transition not in ["t01", "t12", "f01"]:
+            raise ValueError(
+                f"Support only t01, t12, or f01 transitions, not {transition!r}"
+            )
 
         if echo_pulse is not None and echo_pulse not in ("x180", "y180"):
             raise ValueError(
@@ -1301,6 +1304,30 @@ class StormcrowOperations(dsl.QuantumOperations):
             phase=phase,
             length=length,
             pulse=rx_pulse,
+        )
+
+    @staticmethod
+    def measure_section_length(
+        qubits: Stormcrow | Sequence[Stormcrow],
+    ) -> float:
+        """The length of the measure section.
+
+        The length returned is the maximum, over all supplied qubits, of the
+        larger of the readout pulse and readout kernel lengths.
+
+        Arguments:
+            qubits:
+                The qubits to consider for the section length determination.
+
+        Returns:
+            The length of a measure section that involves the supplied qubits.
+        """
+        if not isinstance(qubits, Sequence):
+            qubits = [qubits]
+
+        return max(
+            [q.parameters.readout_integration_length for q in qubits]
+            + [q.parameters.readout_length for q in qubits]
         )
 
 
